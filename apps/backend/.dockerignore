@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+README.md
+**/*.spec.ts
+**/*.test.ts
+test/
+prisma/migrations/
+.husky/

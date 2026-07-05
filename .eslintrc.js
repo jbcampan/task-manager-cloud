@@ -54,6 +54,7 @@ module.exports = {
       files: ['apps/backend/**/*.ts'],
       parserOptions: {
         project: './apps/backend/tsconfig.json',
+        tsconfigRootDir: __dirname,
       },
       rules: {
         '@typescript-eslint/explicit-function-return-type': 'off',
@@ -64,6 +65,7 @@ module.exports = {
       files: ['apps/frontend/**/*.{ts,tsx}'],
       parserOptions: {
         project: './apps/frontend/tsconfig.json',
+        tsconfigRootDir: __dirname,
         ecmaFeatures: { jsx: true },
       },
       rules: {

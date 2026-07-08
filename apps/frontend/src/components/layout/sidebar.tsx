@@ -4,6 +4,7 @@ import { LayoutDashboard, ListTodo, LogOut, Settings, SquareCheckBig } from 'luc
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { logoutAction } from '@/lib/actions/auth.actions';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -44,14 +45,16 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <button
-        type="button"
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50"
-      >
-        {/* TODO (2.2): clear the httpOnly session cookie via a server action and redirect to /login */}
-        <LogOut className="h-4 w-4" />
-        Logout
-      </button>
+      {/* No fields needed: logoutAction takes no arguments, the form just triggers it on submit. */}
+      <form action={logoutAction}>
+        <button
+          type="submit"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </button>
+      </form>
     </aside>
   );
 }

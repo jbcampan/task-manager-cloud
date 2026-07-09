@@ -1,16 +1,39 @@
 import { CheckCircle2, Clock, ListChecks, TriangleAlert } from 'lucide-react';
 
+import { StatusTabs } from '@/components/tasks/status-tabs';
 import { TaskTable } from '@/components/tasks/task-table';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/ui/stat-card';
 import { getTasks } from '@/lib/api/tasks';
 import { withSession } from '@/lib/session';
 import { computeTaskStats } from '@/lib/tasks-stats';
+import { TaskStatus } from '@/lib/types/task';
 
-// TODO: status filter tabs (Commit 3), "New Task" drawer (Commit 4).
-export default async function TasksPage() {
-  const tasks = await withSession((token) => getTasks(token));
-  const stats = computeTaskStats(tasks);
+interface TasksPageProps {
+  searchParams: { status?: string };
+}
+
+// Narrows the raw query string to a real TaskStatus, ignoring unknown/invalid values
+// (e.g. someone editing the URL by hand) rather than letting them reach the API.
+function parseStatusParam(value?: string): TaskStatus | undefined {
+  return value && Object.values(TaskStatus).includes(value as TaskStatus)
+    ? (value as TaskStatus)
+    : undefined;
+}
+
+// TODO: "New Task" drawer (Commit 4).
+export default async function TasksPage({ searchParams }: TasksPageProps) {
+  const activeStatus = parseStatusParam(searchParams.status);
+
+  // Stats always reflect the full task list, regardless of the active filter tab -
+  // otherwise "Overdue" would show 0 while viewing the "Done" tab, which would be misleading.
+  const [allTasks, filteredTasks] = await withSession(async (token) => {
+    const all = await getTasks(token);
+    const filtered = activeStatus ? all.filter((t) => t.status === activeStatus) : all;
+    return [all, filtered] as const;
+  });
+
+  const stats = computeTaskStats(allTasks);
 
   return (
     <div>
@@ -50,7 +73,8 @@ export default async function TasksPage() {
         />
       </div>
 
-      <TaskTable tasks={tasks} />
+      <StatusTabs activeStatus={activeStatus} />
+      <TaskTable tasks={filteredTasks} />
     </div>
   );
 }

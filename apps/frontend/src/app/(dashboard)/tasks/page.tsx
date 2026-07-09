@@ -1,12 +1,17 @@
 import { CheckCircle2, Clock, ListChecks, TriangleAlert } from 'lucide-react';
 
+import { TaskTable } from '@/components/tasks/task-table';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/ui/stat-card';
+import { getTasks } from '@/lib/api/tasks';
+import { withSession } from '@/lib/session';
+import { computeTaskStats } from '@/lib/tasks-stats';
 
-// TODO (2.3): replace the static stats and the placeholder block below with
-// live data fetched from GET /api/v1/tasks through the typed API client,
-// plus the task table, filters and the create/edit drawer.
-export default function TasksPage() {
+// TODO: status filter tabs (Commit 3), "New Task" drawer (Commit 4).
+export default async function TasksPage() {
+  const tasks = await withSession((token) => getTasks(token));
+  const stats = computeTaskStats(tasks);
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -19,35 +24,33 @@ export default function TasksPage() {
           icon={ListChecks}
           iconClassName="bg-blue-100 text-blue-600"
           label="Total tasks"
-          value="-"
+          value={stats.total}
           description="All tasks in your workspace"
         />
         <StatCard
           icon={Clock}
           iconClassName="bg-amber-100 text-amber-600"
           label="In Progress"
-          value="-"
+          value={stats.inProgress}
           description="Tasks currently in progress"
         />
         <StatCard
           icon={CheckCircle2}
           iconClassName="bg-green-100 text-green-600"
           label="Done"
-          value="-"
+          value={stats.done}
           description="Tasks completed"
         />
         <StatCard
           icon={TriangleAlert}
           iconClassName="bg-red-100 text-red-600"
           label="Overdue"
-          value="-"
+          value={stats.overdue}
           description="Tasks past due date"
         />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
-        Task list, filters and creation form will be implemented in Step 2.3.
-      </div>
+      <TaskTable tasks={tasks} />
     </div>
   );
 }

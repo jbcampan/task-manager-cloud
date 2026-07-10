@@ -1,8 +1,8 @@
 import { CheckCircle2, Clock, ListChecks, TriangleAlert } from 'lucide-react';
 
+import { NewTaskButton } from '@/components/tasks/new-task-button';
 import { StatusTabs } from '@/components/tasks/status-tabs';
 import { TaskTable } from '@/components/tasks/task-table';
-import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/ui/stat-card';
 import { getTasks } from '@/lib/api/tasks';
 import { withSession } from '@/lib/session';
@@ -21,7 +21,6 @@ function parseStatusParam(value?: string): TaskStatus | undefined {
     : undefined;
 }
 
-// TODO: "New Task" drawer (Commit 4).
 export default async function TasksPage({ searchParams }: TasksPageProps) {
   const activeStatus = parseStatusParam(searchParams.status);
 
@@ -39,7 +38,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-slate-900">My Tasks</h1>
-        <Button>+ New Task</Button>
+        <NewTaskButton />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

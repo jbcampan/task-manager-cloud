@@ -1,5 +1,6 @@
-import { CalendarDays, Pencil, Trash2 } from 'lucide-react';
+import { CalendarDays, Trash2 } from 'lucide-react';
 
+import { EditTaskButton } from '@/components/tasks/edit-task-button';
 import { Badge } from '@/components/ui/badge';
 import {
   PRIORITY_BADGE_CLASSES,
@@ -14,8 +15,6 @@ interface TaskTableProps {
   tasks: Task[];
 }
 
-// TODO: the edit/delete buttons below are disabled placeholders — wired to
-// the TaskDrawer and delete confirmation dialog in Commits 5 and 6.
 export function TaskTable({ tasks }: TaskTableProps) {
   if (tasks.length === 0) {
     return (
@@ -65,19 +64,12 @@ export function TaskTable({ tasks }: TaskTableProps) {
                     {formatDate(task.dueDate)}
                   </span>
                 ) : (
-                  '—'
+                  '-'
                 )}
               </td>
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-1">
-                  <button
-                    type="button"
-                    disabled
-                    aria-label="Edit task"
-                    className="cursor-not-allowed rounded-lg p-1.5 text-slate-300"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  <EditTaskButton task={task} />
                   <button
                     type="button"
                     disabled

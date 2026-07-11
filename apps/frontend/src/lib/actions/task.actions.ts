@@ -2,9 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { createTask } from '@/lib/api/tasks';
+import { createTask, updateTask } from '@/lib/api/tasks';
 import { withSession } from '@/lib/session';
-import type { CreateTaskPayload } from '@/lib/types/task';
+import type { CreateTaskPayload, UpdateTaskPayload } from '@/lib/types/task';
 
 interface ActionResult {
   error?: string;
@@ -18,6 +18,21 @@ export async function createTaskAction(payload: CreateTaskPayload): Promise<Acti
     // withSession already handles a 401 by redirecting - anything reaching here
     // is a real validation/server error to surface in the form.
     return { error: error instanceof Error ? error.message : 'Unable to create the task.' };
+  }
+
+  revalidatePath('/tasks');
+  return {};
+}
+
+/** Server Action: updates a task via PATCH /tasks/:id and refreshes the /tasks page cache. */
+export async function updateTaskAction(
+  id: string,
+  payload: UpdateTaskPayload,
+): Promise<ActionResult> {
+  try {
+    await withSession((token) => updateTask(token, id, payload));
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Unable to update the task.' };
   }
 
   revalidatePath('/tasks');

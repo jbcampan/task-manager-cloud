@@ -1,5 +1,6 @@
-import { CalendarDays, Trash2 } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 
+import { DeleteTaskButton } from '@/components/tasks/delete-task-button';
 import { EditTaskButton } from '@/components/tasks/edit-task-button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -70,14 +71,7 @@ export function TaskTable({ tasks }: TaskTableProps) {
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-1">
                   <EditTaskButton task={task} />
-                  <button
-                    type="button"
-                    disabled
-                    aria-label="Delete task"
-                    className="cursor-not-allowed rounded-lg p-1.5 text-slate-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <DeleteTaskButton task={task} />
                 </div>
               </td>
             </tr>

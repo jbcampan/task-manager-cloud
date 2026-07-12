@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { createTask, updateTask } from '@/lib/api/tasks';
+import { createTask, deleteTask, updateTask } from '@/lib/api/tasks';
 import { withSession } from '@/lib/session';
 import type { CreateTaskPayload, UpdateTaskPayload } from '@/lib/types/task';
 
@@ -33,6 +33,18 @@ export async function updateTaskAction(
     await withSession((token) => updateTask(token, id, payload));
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Unable to update the task.' };
+  }
+
+  revalidatePath('/tasks');
+  return {};
+}
+
+/** Server Action: deletes a task via DELETE /tasks/:id and refreshes the /tasks page cache. */
+export async function deleteTaskAction(id: string): Promise<ActionResult> {
+  try {
+    await withSession((token) => deleteTask(token, id));
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Unable to delete the task.' };
   }
 
   revalidatePath('/tasks');

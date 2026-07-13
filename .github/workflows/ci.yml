@@ -51,6 +51,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=apps/backend/prisma/schema.prisma
       - name: Apply Prisma migrations
         run: npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma
       # TODO: unit tests (*.spec.ts under src/) are not written yet -

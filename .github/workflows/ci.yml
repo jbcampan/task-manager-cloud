@@ -55,9 +55,7 @@ jobs:
         run: npx prisma generate --schema=apps/backend/prisma/schema.prisma
       - name: Apply Prisma migrations
         run: npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma
-      # TODO: unit tests (*.spec.ts under src/) are not written yet -
-      # --passWithNoTests keeps CI green until they exist. Remove this flag then
-      - run: npm run test --workspace=apps/backend -- --passWithNoTests
+      - run: npm run test --workspace=apps/backend
       - run: npm run test:e2e --workspace=apps/backend
 
   build-frontend:

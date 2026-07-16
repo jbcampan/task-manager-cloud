@@ -1,0 +1,12 @@
+# Terraform working files - never committed
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+
+# Real variable values (contain no secrets here, but kept out of git by convention)
+*.tfvars
+!*.tfvars.example

@@ -1,0 +1,5 @@
+aws_region   = "eu-west-3"
+environment  = "staging"
+project_name = "task-manager"
+
+tfstate_bucket = "REPLACE_WITH_YOUR_BUCKET_NAME"

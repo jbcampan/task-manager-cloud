@@ -27,3 +27,18 @@ output "nat_gateway_id" {
   description = "ID of the single NAT Gateway"
   value       = aws_nat_gateway.this.id
 }
+
+output "alb_security_group_id" {
+  description = "Security group ID for the Application Load Balancer"
+  value       = aws_security_group.alb.id
+}
+
+output "ecs_security_group_id" {
+  description = "Security group ID for ECS Fargate tasks"
+  value       = aws_security_group.ecs.id
+}
+
+output "rds_security_group_id" {
+  description = "Security group ID for the RDS instance"
+  value       = aws_security_group.rds.id
+}

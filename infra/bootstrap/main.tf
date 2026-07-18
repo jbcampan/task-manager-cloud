@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.11.0"   # use_lockfile requires 1.10+, GA since 1.11
+  required_version = ">= 1.11.0" # use_lockfile requires 1.10+, GA since 1.11
 
   required_providers {
     aws = {

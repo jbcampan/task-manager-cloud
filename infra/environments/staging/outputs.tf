@@ -82,3 +82,18 @@ output "db_name" {
   description = "Default database name"
   value       = module.rds.db_name
 }
+
+output "master_user_secret_arn" {
+  description = "Secrets Manager ARN holding the RDS master password"
+  value       = module.rds.master_user_secret_arn
+}
+
+output "uploads_bucket_id" {
+  description = "S3 uploads bucket name"
+  value       = module.s3.bucket_id
+}
+
+output "uploads_rw_policy_arn" {
+  description = "IAM policy ARN for read/write access to the uploads bucket"
+  value       = module.s3.uploads_rw_policy_arn
+}

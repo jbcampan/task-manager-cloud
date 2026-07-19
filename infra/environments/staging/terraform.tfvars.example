@@ -32,3 +32,6 @@ db_multi_az          = false
 # anything you actually care about losing goes into this database
 db_skip_final_snapshot = true
 db_deletion_protection = false
+
+# Leave empty until the ALB or CloudFront URL exists (step 3.3)
+s3_allowed_origins = []

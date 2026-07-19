@@ -122,3 +122,9 @@ variable "db_deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "s3_allowed_origins" {
+  description = "Origins allowed to upload directly to the uploads bucket (CORS). Leave empty until the frontend URL (ALB or CloudFront) is known."
+  type        = list(string)
+  default     = []
+}

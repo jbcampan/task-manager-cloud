@@ -30,6 +30,15 @@ module "cloudwatch" {
   tags                   = local.common_tags
 }
 
+module "s3" {
+  source = "../../_modules/s3"
+
+  environment     = var.environment
+  project_name    = var.project_name
+  allowed_origins = var.s3_allowed_origins
+  tags            = local.common_tags
+}
+
 module "vpc" {
   source = "../../_modules/vpc"
 

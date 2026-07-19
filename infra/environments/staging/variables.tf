@@ -80,3 +80,45 @@ variable "memory_alarm_threshold" {
   type        = number
   default     = 80
 }
+
+variable "db_name" {
+  description = "Name of the default database"
+  type        = string
+  default     = "taskmanager"
+}
+
+variable "db_username" {
+  description = "Master username. The password is managed natively by RDS in Secrets Manager."
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_instance_class" {
+  description = "RDS instance class. db.t4g.micro is not Free Tier eligible - use db.t3.micro if that matters to you."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "Allocated storage in GB"
+  type        = number
+  default     = 20
+}
+
+variable "db_multi_az" {
+  description = "Enable Multi-AZ deployment. Doubles RDS cost, keep false for staging."
+  type        = bool
+  default     = false
+}
+
+variable "db_skip_final_snapshot" {
+  description = "Skip the final snapshot on destroy. true for staging convenience."
+  type        = bool
+  default     = true
+}
+
+variable "db_deletion_protection" {
+  description = "Prevent accidental deletion via the API/Terraform"
+  type        = bool
+  default     = false
+}

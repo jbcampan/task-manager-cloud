@@ -67,3 +67,18 @@ output "dashboard_name" {
   description = "CloudWatch dashboard name"
   value       = module.cloudwatch.dashboard_name
 }
+
+output "db_instance_endpoint" {
+  description = "RDS connection endpoint, host:port"
+  value       = module.rds.db_instance_endpoint
+}
+
+output "db_instance_address" {
+  description = "RDS hostname, without the port"
+  value       = module.rds.db_instance_address
+}
+
+output "db_name" {
+  description = "Default database name"
+  value       = module.rds.db_name
+}

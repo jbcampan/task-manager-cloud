@@ -21,3 +21,14 @@ alert_email = ""
 
 cpu_alarm_threshold    = 80
 memory_alarm_threshold = 80
+
+db_name              = "taskmanager"
+db_username          = "postgres"
+db_instance_class    = "db.t4g.micro"
+db_allocated_storage = 20
+db_multi_az          = false
+
+# true is convenient while iterating on staging - flip to false before
+# anything you actually care about losing goes into this database
+db_skip_final_snapshot = true
+db_deletion_protection = false

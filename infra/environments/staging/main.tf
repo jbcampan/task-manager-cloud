@@ -1,3 +1,20 @@
+module "rds" {
+  source = "../../_modules/rds"
+
+  environment           = var.environment
+  project_name          = var.project_name
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  rds_security_group_id = module.vpc.rds_security_group_id
+  db_name               = var.db_name
+  db_username           = var.db_username
+  instance_class        = var.db_instance_class
+  allocated_storage     = var.db_allocated_storage
+  multi_az              = var.db_multi_az
+  skip_final_snapshot   = var.db_skip_final_snapshot
+  deletion_protection   = var.db_deletion_protection
+  tags                  = local.common_tags
+}
+
 module "cloudwatch" {
   source = "../../_modules/cloudwatch"
 

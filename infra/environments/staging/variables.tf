@@ -62,3 +62,21 @@ variable "eks_ready" {
   type        = bool
   default     = false
 }
+
+variable "alert_email" {
+  description = "Email address subscribed to the alerts SNS topic. Leave empty to skip the subscription."
+  type        = string
+  default     = ""
+}
+
+variable "cpu_alarm_threshold" {
+  description = "CPU utilization percentage above which an alarm fires"
+  type        = number
+  default     = 80
+}
+
+variable "memory_alarm_threshold" {
+  description = "Memory utilization percentage above which an alarm fires"
+  type        = number
+  default     = 80
+}

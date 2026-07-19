@@ -13,4 +13,11 @@ private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
 backend_container_port  = 3001
 frontend_container_port = 3000
 
+# false until an EKS cluster exists, harmless to enable early
 eks_ready = false
+
+# Leave empty to skip the SNS email subscription for now
+alert_email = ""
+
+cpu_alarm_threshold    = 80
+memory_alarm_threshold = 80

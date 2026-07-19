@@ -47,3 +47,23 @@ output "rds_security_group_id" {
   description = "RDS security group ID"
   value       = module.vpc.rds_security_group_id
 }
+
+output "backend_log_group_name" {
+  description = "Backend CloudWatch log group name"
+  value       = module.cloudwatch.backend_log_group_name
+}
+
+output "frontend_log_group_name" {
+  description = "Frontend CloudWatch log group name"
+  value       = module.cloudwatch.frontend_log_group_name
+}
+
+output "sns_topic_arn" {
+  description = "SNS topic ARN for CPU/memory alarms"
+  value       = module.cloudwatch.sns_topic_arn
+}
+
+output "dashboard_name" {
+  description = "CloudWatch dashboard name"
+  value       = module.cloudwatch.dashboard_name
+}

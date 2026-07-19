@@ -23,5 +23,12 @@ locals {
     Environment = var.environment
     ManagedBy   = "terraform"
   }
+
+    # Naming convention shared with the ECS module - CloudWatch
+  # alarms below are wired to these names before the ECS resources exist,
+  # they will report INSUFFICIENT_DATA until the service is created.
+  ecs_cluster_name      = "${var.project_name}-${var.environment}"
+  backend_service_name  = "${var.project_name}-${var.environment}-backend"
+  frontend_service_name = "${var.project_name}-${var.environment}-frontend"
 }
 

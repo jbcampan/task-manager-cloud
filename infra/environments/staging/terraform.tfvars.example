@@ -33,5 +33,10 @@ db_multi_az          = false
 db_skip_final_snapshot = true
 db_deletion_protection = false
 
-# Leave empty until the ALB or CloudFront URL exists (step 3.3)
+# Leave empty until the ALB or CloudFront URL exists
 s3_allowed_origins = []
+
+# Format: owner/repo, e.g. "jdupont/task-manager-cloud" - same value as shared/terraform.tfvars
+github_repository = "REPLACE_WITH_YOUR_GITHUB_USERNAME/task-manager-cloud"
+
+github_environment = "staging"

@@ -39,6 +39,20 @@ module "s3" {
   tags            = local.common_tags
 }
 
+module "iam_oidc" {
+  source = "../../_modules/iam-oidc"
+
+  environment           = var.environment
+  project_name          = var.project_name
+  oidc_provider_arn     = data.terraform_remote_state.shared.outputs.oidc_provider_arn
+  github_repository     = var.github_repository
+  github_environment    = var.github_environment
+  ecs_cluster_name      = local.ecs_cluster_name
+  backend_service_name  = local.backend_service_name
+  frontend_service_name = local.frontend_service_name
+  tags                  = local.common_tags
+}
+
 module "vpc" {
   source = "../../_modules/vpc"
 

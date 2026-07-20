@@ -128,3 +128,14 @@ variable "s3_allowed_origins" {
   type        = list(string)
   default     = []
 }
+
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the deploy role, format: owner/repo"
+  type        = string
+}
+
+variable "github_environment" {
+  description = "GitHub Environment name required in the workflow job (Settings > Environments), must exist on GitHub before the first deploy"
+  type        = string
+  default     = "staging"
+}

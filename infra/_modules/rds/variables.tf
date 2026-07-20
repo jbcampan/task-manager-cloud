@@ -39,7 +39,7 @@ variable "db_username" {
 variable "engine_version" {
   description = "PostgreSQL engine version. Verify currently supported versions for your region before applying (aws rds describe-db-engine-versions --engine postgres), AWS periodically retires old minor versions."
   type        = string
-  default     = "16.4"
+  default     = "16"
 }
 
 variable "instance_class" {
@@ -67,9 +67,9 @@ variable "multi_az" {
 }
 
 variable "backup_retention_period" {
-  description = "Number of days to retain automated backups"
+  description = "Number of days to retain automated backups. Kept low (0) by default - AWS's restricted Free Plan caps this well below the standard RDS maximum of 35 days."
   type        = number
-  default     = 7
+  default     = 0
 }
 
 variable "skip_final_snapshot" {

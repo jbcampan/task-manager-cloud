@@ -97,3 +97,8 @@ output "uploads_rw_policy_arn" {
   description = "IAM policy ARN for read/write access to the uploads bucket"
   value       = module.s3.uploads_rw_policy_arn
 }
+
+output "deploy_role_arn" {
+  description = "ARN of the IAM role for the CD workflow"
+  value       = module.iam_oidc.deploy_role_arn
+}

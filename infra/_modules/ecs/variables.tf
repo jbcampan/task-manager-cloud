@@ -14,6 +14,12 @@ variable "project_name" {
   default     = "task-manager"
 }
 
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "eu-west-3"
+}
+
 variable "vpc_id" {
   description = "VPC ID (from the vpc module)"
   type        = string
@@ -34,6 +40,28 @@ variable "alb_security_group_id" {
   type        = string
 }
 
+variable "ecr_backend_repository_url" {
+  description = "URL of the backend ECR repository (from the shared/ state)"
+  type        = string
+}
+
+variable "ecr_frontend_repository_url" {
+  description = "URL of the frontend ECR repository (from the shared/ state)"
+  type        = string
+}
+
+variable "backend_image_tag" {
+  description = "Image tag to deploy for the backend. Defaults to latest for the first apply - the CD workflow (4.3) will override this with a git SHA on every deploy."
+  type        = string
+  default     = "latest"
+}
+
+variable "frontend_image_tag" {
+  description = "Image tag to deploy for the frontend. Defaults to latest for the first apply - the CD workflow (4.3) will override this with a git SHA on every deploy."
+  type        = string
+  default     = "latest"
+}
+
 variable "backend_container_port" {
   description = "Port the NestJS backend container listens on"
   type        = number
@@ -46,9 +74,70 @@ variable "frontend_container_port" {
   default     = 3000
 }
 
+variable "backend_cpu" {
+  description = "Fargate CPU units for the backend task (256 = 0.25 vCPU)"
+  type        = number
+  default     = 256
+}
+
+variable "backend_memory" {
+  description = "Fargate memory in MB for the backend task"
+  type        = number
+  default     = 512
+}
+
+variable "frontend_cpu" {
+  description = "Fargate CPU units for the frontend task"
+  type        = number
+  default     = 256
+}
+
+variable "frontend_memory" {
+  description = "Fargate memory in MB for the frontend task"
+  type        = number
+  default     = 512
+}
+
+variable "backend_log_group_name" {
+  description = "CloudWatch log group for backend container logs (from the cloudwatch module)"
+  type        = string
+}
+
+variable "frontend_log_group_name" {
+  description = "CloudWatch log group for frontend container logs (from the cloudwatch module)"
+  type        = string
+}
+
 variable "public_subnet_ids" {
   description = "Public subnet IDs for the ALB (from the vpc module)"
   type        = list(string)
+}
+
+variable "db_address" {
+  description = "RDS instance hostname, without port (from the rds module)"
+  type        = string
+}
+
+variable "db_port" {
+  description = "RDS instance port"
+  type        = number
+  default     = 5432
+}
+
+variable "db_name" {
+  description = "Default database name (from the rds module)"
+  type        = string
+}
+
+variable "db_username" {
+  description = "Master username (from the rds module)"
+  type        = string
+}
+
+variable "jwt_expires_in" {
+  description = "JWT expiration, passed to the backend as an environment variable"
+  type        = string
+  default     = "7d"
 }
 
 variable "alb_deletion_protection" {

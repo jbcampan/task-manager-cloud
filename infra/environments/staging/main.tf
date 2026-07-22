@@ -73,6 +73,9 @@ module "ecs" {
 
   environment            = var.environment
   project_name           = var.project_name
+  vpc_id                 = module.vpc.vpc_id
+  public_subnet_ids      = module.vpc.public_subnet_ids
+  alb_security_group_id  = module.vpc.alb_security_group_id
   master_user_secret_arn = module.rds.master_user_secret_arn
   uploads_rw_policy_arn  = module.s3.uploads_rw_policy_arn
   tags                   = local.common_tags

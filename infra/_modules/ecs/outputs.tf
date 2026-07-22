@@ -17,3 +17,18 @@ output "task_role_arn" {
   description = "ARN of the ECS task role"
   value       = aws_iam_role.task.arn
 }
+
+output "alb_dns_name" {
+  description = "Public DNS name of the ALB - this is the URL for the whole app"
+  value       = aws_lb.this.dns_name
+}
+
+output "backend_target_group_arn" {
+  description = "ARN of the backend target group"
+  value       = aws_lb_target_group.backend.arn
+}
+
+output "frontend_target_group_arn" {
+  description = "ARN of the frontend target group"
+  value       = aws_lb_target_group.frontend.arn
+}

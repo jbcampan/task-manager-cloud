@@ -67,3 +67,13 @@ module "vpc" {
   eks_ready               = var.eks_ready
   tags                    = local.common_tags
 }
+
+module "ecs" {
+  source = "../../_modules/ecs"
+
+  environment            = var.environment
+  project_name           = var.project_name
+  master_user_secret_arn = module.rds.master_user_secret_arn
+  uploads_rw_policy_arn  = module.s3.uploads_rw_policy_arn
+  tags                   = local.common_tags
+}

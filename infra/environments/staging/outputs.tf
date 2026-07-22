@@ -102,3 +102,18 @@ output "deploy_role_arn" {
   description = "ARN of the IAM role for the CD workflow"
   value       = module.iam_oidc.deploy_role_arn
 }
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name"
+  value       = module.ecs.cluster_name
+}
+
+output "ecs_execution_role_arn" {
+  description = "ECS task execution role ARN"
+  value       = module.ecs.execution_role_arn
+}
+
+output "ecs_task_role_arn" {
+  description = "ECS task role ARN"
+  value       = module.ecs.task_role_arn
+}

@@ -75,8 +75,10 @@ module "ecs" {
   project_name                = var.project_name
   aws_region                  = var.aws_region
   vpc_id                      = module.vpc.vpc_id
+  private_subnet_ids          = module.vpc.private_subnet_ids
   public_subnet_ids           = module.vpc.public_subnet_ids
   alb_security_group_id       = module.vpc.alb_security_group_id
+  ecs_security_group_id       = module.vpc.ecs_security_group_id
   ecr_backend_repository_url  = data.terraform_remote_state.shared.outputs.ecr_backend_repository_url
   ecr_frontend_repository_url = data.terraform_remote_state.shared.outputs.ecr_frontend_repository_url
   backend_log_group_name      = module.cloudwatch.backend_log_group_name
@@ -85,6 +87,7 @@ module "ecs" {
   db_name                     = module.rds.db_name
   db_username                 = module.rds.db_username
   master_user_secret_arn      = module.rds.master_user_secret_arn
+  uploads_bucket_id           = module.s3.bucket_id
   uploads_rw_policy_arn       = module.s3.uploads_rw_policy_arn
   tags                        = local.common_tags
 }

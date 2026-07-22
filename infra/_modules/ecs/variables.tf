@@ -25,6 +25,16 @@ variable "vpc_id" {
   type        = string
 }
 
+variable "private_subnet_ids" {
+  description = "Private subnet IDs for ECS tasks (from the vpc module)"
+  type        = list(string)
+}
+
+variable "public_subnet_ids" {
+  description = "Public subnet IDs for the ALB (from the vpc module)"
+  type        = list(string)
+}
+
 variable "master_user_secret_arn" {
   description = "Secrets Manager ARN holding the RDS master password, in username/password JSON keys (from the rds module)"
   type        = string
@@ -37,6 +47,11 @@ variable "uploads_rw_policy_arn" {
 
 variable "alb_security_group_id" {
   description = "Security group ID for the ALB (from the vpc module)"
+  type        = string
+}
+
+variable "ecs_security_group_id" {
+  description = "Security group ID for ECS tasks (from the vpc module)"
   type        = string
 }
 
@@ -98,6 +113,18 @@ variable "frontend_memory" {
   default     = 512
 }
 
+variable "backend_desired_count" {
+  description = "Number of backend tasks to run"
+  type        = number
+  default     = 1
+}
+
+variable "frontend_desired_count" {
+  description = "Number of frontend tasks to run"
+  type        = number
+  default     = 1
+}
+
 variable "backend_log_group_name" {
   description = "CloudWatch log group for backend container logs (from the cloudwatch module)"
   type        = string
@@ -106,11 +133,6 @@ variable "backend_log_group_name" {
 variable "frontend_log_group_name" {
   description = "CloudWatch log group for frontend container logs (from the cloudwatch module)"
   type        = string
-}
-
-variable "public_subnet_ids" {
-  description = "Public subnet IDs for the ALB (from the vpc module)"
-  type        = list(string)
 }
 
 variable "db_address" {
@@ -138,6 +160,11 @@ variable "jwt_expires_in" {
   description = "JWT expiration, passed to the backend as an environment variable"
   type        = string
   default     = "7d"
+}
+
+variable "uploads_bucket_id" {
+  description = "S3 uploads bucket name (from the s3 module)"
+  type        = string
 }
 
 variable "alb_deletion_protection" {

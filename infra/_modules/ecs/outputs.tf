@@ -32,3 +32,8 @@ output "frontend_target_group_arn" {
   description = "ARN of the frontend target group"
   value       = aws_lb_target_group.frontend.arn
 }
+
+output "app_url" {
+  description = "Public URL of the application (frontend + /api/* backend), served by the ALB"
+  value       = "http://${aws_lb.this.dns_name}"
+}

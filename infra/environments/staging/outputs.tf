@@ -117,3 +117,8 @@ output "ecs_task_role_arn" {
   description = "ECS task role ARN"
   value       = module.ecs.task_role_arn
 }
+
+output "app_url" {
+  description = "Public URL of the application"
+  value       = "http://${module.ecs.alb_dns_name}"
+}

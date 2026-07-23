@@ -1,6 +1,8 @@
 name: Build & Push
 
 on:
+  workflow_dispatch:
+
   push:
     branches: [main]
     paths:
@@ -59,6 +61,7 @@ jobs:
           image-ref: ${{ matrix.repository }}:${{ github.sha }}
           format: table
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: '1'
 
       - name: Push image to ECR

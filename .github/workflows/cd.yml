@@ -1,0 +1,78 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ['Build & Push']
+    types: [completed]
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-staging:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    # Declaring the GitHub Environment here is what makes the OIDC token
+    # carry the "environment:staging" claim - the only claim the staging
+    # deploy role's trust policy (step 3.6) accepts.
+    environment: staging
+    env:
+      AWS_REGION: eu-west-3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure AWS credentials (OIDC, staging deploy role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.STAGING_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # --- Backend ---
+      - name: Download current backend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.STAGING_PROJECT_NAME }}-${{ vars.STAGING_ENVIRONMENT }}-backend \
+            --query taskDefinition > backend-task-def.json
+
+      - name: Render new backend task definition
+        id: render-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task-def.json
+          container-name: backend
+          image: ${{ vars.ECR_BACKEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy backend
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-backend.outputs.task-definition }}
+          cluster: ${{ vars.STAGING_ECS_CLUSTER }}
+          service: ${{ vars.STAGING_ECS_BACKEND_SERVICE }}
+          wait-for-service-stability: true
+
+      # --- Frontend ---
+      - name: Download current frontend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.STAGING_PROJECT_NAME }}-${{ vars.STAGING_ENVIRONMENT }}-frontend \
+            --query taskDefinition > frontend-task-def.json
+
+      - name: Render new frontend task definition
+        id: render-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task-def.json
+          container-name: frontend
+          image: ${{ vars.ECR_FRONTEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy frontend
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-frontend.outputs.task-definition }}
+          cluster: ${{ vars.STAGING_ECS_CLUSTER }}
+          service: ${{ vars.STAGING_ECS_FRONTEND_SERVICE }}
+          wait-for-service-stability: true

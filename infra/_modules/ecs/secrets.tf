@@ -8,6 +8,10 @@ resource "random_password" "jwt_secret" {
 
 resource "aws_secretsmanager_secret" "jwt" {
   name = "${var.project_name}-${var.environment}-jwt-secret"
+  # 0 = delete immediately on destroy, no 30-day recovery window. Appropriate
+  # for staging where destroy/apply cycles are frequent - reconsider for a
+  # real production secret you'd want to be able to recover.
+  recovery_window_in_days = 0
   tags = var.tags
 }
 

@@ -21,6 +21,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
+RUN rm -rf \
+    /usr/local/lib/node_modules/npm \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx \
+    /usr/local/bin/corepack
+
 # The standalone output only ships the JS actually needed at runtime — public
 # assets and static build output must be copied in separately.
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public

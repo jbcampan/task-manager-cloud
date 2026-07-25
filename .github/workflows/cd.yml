@@ -50,25 +50,6 @@ jobs:
           container-name: backend
           image: ${{ vars.ECR_BACKEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
 
-      # --- Backend: render -> register -> migrate -> deploy ---
-      # The migration must run against the NEW image (new Prisma
-      # schema/client) but BEFORE the service is updated, so running
-      # containers never see a schema they don't expect.
-
-      - name: Download current backend task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition ${{ vars.STAGING_PROJECT_NAME }}-${{ vars.STAGING_ENVIRONMENT }}-backend \
-            --query taskDefinition > backend-task-def.json
-
-      - name: Render new backend task definition
-        id: render-backend
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: backend-task-def.json
-          container-name: backend
-          image: ${{ vars.ECR_BACKEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
-
       - name: Register new backend task definition
         id: register-backend
         run: |

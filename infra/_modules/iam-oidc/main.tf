@@ -23,6 +23,15 @@ locals {
   backend_service_arn  = "arn:aws:ecs:${local.region}:${local.account_id}:service/${var.ecs_cluster_name}/${var.backend_service_name}"
   frontend_service_arn = "arn:aws:ecs:${local.region}:${local.account_id}:service/${var.ecs_cluster_name}/${var.frontend_service_name}"
 
+  # Family-scoped, all revisions - RunTask needs the task definition ARN,
+  # not the family name, and the CD workflow registers a fresh revision
+  # on every deploy.
+  backend_task_def_arn = "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${var.project_name}-${var.environment}-backend:*"
+
+  # Task ARNs are only known once RunTask has already run, so this scopes
+  # DescribeTasks/StopTask to "any task in this cluster" rather than "*".
+  cluster_task_arn = "arn:aws:ecs:${local.region}:${local.account_id}:task/${var.ecs_cluster_name}/*"
+
   ecs_execution_role_arn = "arn:aws:iam::${local.account_id}:role/${var.project_name}-${var.environment}-ecs-execution"
   ecs_task_role_arn      = "arn:aws:iam::${local.account_id}:role/${var.project_name}-${var.environment}-ecs-task"
 }
@@ -93,6 +102,37 @@ data "aws_iam_policy_document" "deploy_permissions" {
     # AWS does not support resource-level scoping for these three actions,
     # "*" is required here regardless of how narrow the rest of the policy is.
     resources = ["*"]
+  }
+
+  # ---------------------------------------------------------------
+  # One-off migration task (Prisma "migrate deploy"), run via
+  # "aws ecs run-task" before the backend service is updated.
+  # Scoped to the backend task definition family and gated to this
+  # cluster only via the ecs:cluster condition key.
+  # ---------------------------------------------------------------
+  statement {
+    sid    = "EcsRunMigrationTask"
+    effect = "Allow"
+    actions = [
+      "ecs:RunTask",
+    ]
+    resources = [local.backend_task_def_arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "ecs:cluster"
+      values   = [local.cluster_arn]
+    }
+  }
+
+  statement {
+    sid    = "EcsMonitorMigrationTask"
+    effect = "Allow"
+    actions = [
+      "ecs:DescribeTasks",
+      "ecs:StopTask",
+    ]
+    resources = [local.cluster_task_arn]
   }
 
   statement {

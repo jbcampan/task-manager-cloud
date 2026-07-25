@@ -12,7 +12,7 @@ resource "aws_secretsmanager_secret" "jwt" {
   # for staging where destroy/apply cycles are frequent - reconsider for a
   # real production secret you'd want to be able to recover.
   recovery_window_in_days = 0
-  tags = var.tags
+  tags                    = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "jwt" {

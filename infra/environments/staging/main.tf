@@ -89,5 +89,6 @@ module "ecs" {
   master_user_secret_arn      = module.rds.master_user_secret_arn
   uploads_bucket_id           = module.s3.bucket_id
   uploads_rw_policy_arn       = module.s3.uploads_rw_policy_arn
+  cookie_secure               = false  # flip to true once HTTPS/ACM is added in front of the ALB
   tags                        = local.common_tags
 }

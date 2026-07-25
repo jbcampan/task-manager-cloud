@@ -184,3 +184,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cookie_secure" {
+  description = "Whether the frontend session cookie must be marked Secure. Requires HTTPS on the ALB (ACM certificate) - set to false until that's in place."
+  type        = bool
+  default     = false
+}

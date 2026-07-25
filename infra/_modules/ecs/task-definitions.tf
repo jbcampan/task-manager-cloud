@@ -82,6 +82,9 @@ resource "aws_ecs_task_definition" "frontend" {
         # Server-only, never NEXT_PUBLIC_ - same ALB serves both apps, so
         # the frontend calls /api/* on its own origin.
         { name = "API_URL", value = "http://${aws_lb.this.dns_name}/api/v1" },
+        # false until an ACM certificate + HTTPS listener sit in front of
+        # the ALB - see apps/frontend/src/lib/auth.ts for why this matters.
+        { name = "COOKIE_SECURE", value = var.cookie_secure ? "true" : "false" },
       ]
 
       logConfiguration = {

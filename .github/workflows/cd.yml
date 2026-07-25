@@ -13,119 +13,24 @@ permissions:
 jobs:
   deploy-staging:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
-    # Declaring the GitHub Environment here is what makes the OIDC token
-    # carry the "environment:staging" claim - the only claim the staging
-    # deploy role's trust policy (step 3.6) accepts.
-    environment: staging
-    env:
-      AWS_REGION: eu-west-3
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+    uses: ./.github/workflows/deploy-reusable.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      environment: staging
+      image_tag: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Configure AWS credentials (OIDC, staging deploy role)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.STAGING_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      # --- Backend: render -> register -> migrate -> deploy ---
-      # The migration must run against the NEW image (new Prisma
-      # schema/client) but BEFORE the service is updated, so running
-      # containers never see a schema they don't expect.
-
-      - name: Download current backend task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition ${{ vars.STAGING_PROJECT_NAME }}-${{ vars.STAGING_ENVIRONMENT }}-backend \
-            --query taskDefinition > backend-task-def.json
-
-      - name: Render new backend task definition
-        id: render-backend
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: backend-task-def.json
-          container-name: backend
-          image: ${{ vars.ECR_BACKEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
-
-      - name: Register new backend task definition
-        id: register-backend
-        run: |
-          # describe-task-definition returns read-only fields that
-          # register-task-definition rejects - strip them first.
-          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-            "${{ steps.render-backend.outputs.task-definition }}" > backend-task-def-clean.json
-
-          TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://backend-task-def-clean.json \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-
-          echo "Registered $TASK_DEF_ARN"
-          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
-
-      - name: Run database migration (one-off ECS task)
-        run: |
-          TASK_ARN=$(aws ecs run-task \
-            --cluster "${{ vars.STAGING_ECS_CLUSTER }}" \
-            --task-definition "${{ steps.register-backend.outputs.task_def_arn }}" \
-            --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=[${{ vars.STAGING_PRIVATE_SUBNET_IDS }}],securityGroups=[${{ vars.STAGING_ECS_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
-            --overrides '{"containerOverrides":[{"name":"backend","command":["node","node_modules/prisma/build/index.js","migrate","deploy"]}]}' \
-            --query 'tasks[0].taskArn' --output text)
-
-          echo "Migration task started: $TASK_ARN"
-          echo "Waiting for it to stop..."
-          aws ecs wait tasks-stopped --cluster "${{ vars.STAGING_ECS_CLUSTER }}" --tasks "$TASK_ARN"
-
-          EXIT_CODE=$(aws ecs describe-tasks \
-            --cluster "${{ vars.STAGING_ECS_CLUSTER }}" --tasks "$TASK_ARN" \
-            --query 'tasks[0].containers[0].exitCode' --output text)
-          STOP_REASON=$(aws ecs describe-tasks \
-            --cluster "${{ vars.STAGING_ECS_CLUSTER }}" --tasks "$TASK_ARN" \
-            --query 'tasks[0].stoppedReason' --output text)
-
-          echo "Exit code: $EXIT_CODE — Stop reason: $STOP_REASON"
-
-          # "None" means the container never reported an exit code at all
-          # (e.g. it failed to provision) - treat that as a failure too.
-          if [ "$EXIT_CODE" = "None" ] || [ "$EXIT_CODE" != "0" ]; then
-            echo "::error::Prisma migration failed (exit code $EXIT_CODE). Deployment aborted."
-            exit 1
-          fi
-
-      - name: Deploy backend service
-        run: |
-          aws ecs update-service \
-            --cluster "${{ vars.STAGING_ECS_CLUSTER }}" \
-            --service "${{ vars.STAGING_ECS_BACKEND_SERVICE }}" \
-            --task-definition "${{ steps.register-backend.outputs.task_def_arn }}" \
-            --force-new-deployment > /dev/null
-
-          aws ecs wait services-stable \
-            --cluster "${{ vars.STAGING_ECS_CLUSTER }}" \
-            --services "${{ vars.STAGING_ECS_BACKEND_SERVICE }}"
-
-      # --- Frontend ---
-      - name: Download current frontend task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition ${{ vars.STAGING_PROJECT_NAME }}-${{ vars.STAGING_ENVIRONMENT }}-frontend \
-            --query taskDefinition > frontend-task-def.json
-
-      - name: Render new frontend task definition
-        id: render-frontend
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: frontend-task-def.json
-          container-name: frontend
-          image: ${{ vars.ECR_FRONTEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}
-
-      - name: Deploy frontend
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render-frontend.outputs.task-definition }}
-          cluster: ${{ vars.STAGING_ECS_CLUSTER }}
-          service: ${{ vars.STAGING_ECS_FRONTEND_SERVICE }}
-          wait-for-service-stability: true
+  deploy-prod:
+    needs: deploy-staging
+    # Prod infra (infra/environments/prod) doesn't exist yet - this job
+    # is a no-op until the PROD_INFRA_READY repo variable is set to
+    # "true", which happens once that Terraform environment is applied.
+    if: ${{ vars.PROD_INFRA_READY == 'true' }}
+    uses: ./.github/workflows/deploy-reusable.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      environment: production
+      image_tag: ${{ github.event.workflow_run.head_sha }}

@@ -1,0 +1,144 @@
+name: Deploy (reusable)
+
+# Called once per target environment by cd.yml. The `environment:` set on
+# the job below is what makes GitHub resolve vars.* / secrets.* from the
+# matching GitHub Environment (staging or production) and, for production,
+# what makes GitHub pause the job until a required reviewer approves it.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'GitHub Environment to deploy to (staging or production)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Docker image tag to deploy (commit SHA)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      AWS_REGION: eu-west-3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.image_tag }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # --- Backend: render -> register -> migrate -> deploy ---
+      # The migration must run against the NEW image (new Prisma
+      # schema/client) but BEFORE the service is updated, so running
+      # containers never see a schema they don't expect.
+
+      - name: Download current backend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.PROJECT_NAME }}-${{ vars.ENVIRONMENT }}-backend \
+            --query taskDefinition > backend-task-def.json
+
+      - name: Render new backend task definition
+        id: render-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task-def.json
+          container-name: backend
+          image: ${{ vars.ECR_BACKEND_REPOSITORY }}:${{ inputs.image_tag }}
+
+      - name: Register new backend task definition
+        id: register-backend
+        run: |
+          # describe-task-definition returns read-only fields that
+          # register-task-definition rejects - strip them first.
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            "${{ steps.render-backend.outputs.task-definition }}" > backend-task-def-clean.json
+
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://backend-task-def-clean.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          echo "Registered $TASK_DEF_ARN"
+          echo "task_def_arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migration (one-off ECS task)
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "${{ vars.ECS_CLUSTER }}" \
+            --task-definition "${{ steps.register-backend.outputs.task_def_arn }}" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ vars.PRIVATE_SUBNET_IDS }}],securityGroups=[${{ vars.ECS_SECURITY_GROUP_ID }}],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"backend","command":["node","node_modules/prisma/build/index.js","migrate","deploy"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+
+          echo "Migration task started: $TASK_ARN"
+          echo "Waiting for it to stop..."
+          aws ecs wait tasks-stopped --cluster "${{ vars.ECS_CLUSTER }}" --tasks "$TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${{ vars.ECS_CLUSTER }}" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          STOP_REASON=$(aws ecs describe-tasks \
+            --cluster "${{ vars.ECS_CLUSTER }}" --tasks "$TASK_ARN" \
+            --query 'tasks[0].stoppedReason' --output text)
+
+          echo "Exit code: $EXIT_CODE — Stop reason: $STOP_REASON"
+
+          # "None" means the container never reported an exit code at all
+          # (e.g. it failed to provision) - treat that as a failure too.
+          if [ "$EXIT_CODE" = "None" ] || [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Prisma migration failed (exit code $EXIT_CODE). Deployment aborted."
+            exit 1
+          fi
+
+      - name: Deploy backend service
+        run: |
+          aws ecs update-service \
+            --cluster "${{ vars.ECS_CLUSTER }}" \
+            --service "${{ vars.ECS_BACKEND_SERVICE }}" \
+            --task-definition "${{ steps.register-backend.outputs.task_def_arn }}" \
+            --force-new-deployment > /dev/null
+
+          aws ecs wait services-stable \
+            --cluster "${{ vars.ECS_CLUSTER }}" \
+            --services "${{ vars.ECS_BACKEND_SERVICE }}"
+
+      # --- Frontend ---
+      - name: Download current frontend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ vars.PROJECT_NAME }}-${{ vars.ENVIRONMENT }}-frontend \
+            --query taskDefinition > frontend-task-def.json
+
+      - name: Render new frontend task definition
+        id: render-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task-def.json
+          container-name: frontend
+          image: ${{ vars.ECR_FRONTEND_REPOSITORY }}:${{ inputs.image_tag }}
+
+      - name: Deploy frontend
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-frontend.outputs.task-definition }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          service: ${{ vars.ECS_FRONTEND_SERVICE }}
+          wait-for-service-stability: true
+
+      - name: Summary
+        run: |
+          echo "### Deployed to \`${{ inputs.environment }}\` :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image tag: \`${{ inputs.image_tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ vars.APP_URL }}" >> "$GITHUB_STEP_SUMMARY"

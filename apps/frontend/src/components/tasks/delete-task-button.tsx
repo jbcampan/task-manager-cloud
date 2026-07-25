@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { deleteTaskAction } from '@/lib/actions/task.actions';
 import type { Task } from '@/lib/types/task';
 
-/** Owns the confirmation dialog and deletion state for a single task row. */
+/** Owns the confirmation dialog, and deletion state for a single task row. */
 export function DeleteTaskButton({ task }: { task: Task }) {
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);

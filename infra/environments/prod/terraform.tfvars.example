@@ -1,0 +1,46 @@
+aws_region   = "eu-west-3"
+environment  = "prod"
+project_name = "task-manager"
+
+tfstate_bucket = "REPLACE_WITH_YOUR_BUCKET_NAME"
+
+vpc_cidr = "10.1.0.0/16"
+azs      = ["eu-west-3a", "eu-west-3b"]
+
+public_subnet_cidrs  = ["10.1.1.0/24", "10.1.2.0/24"]
+private_subnet_cidrs = ["10.1.11.0/24", "10.1.12.0/24"]
+
+backend_container_port  = 3001
+frontend_container_port = 3000
+
+# false until an EKS cluster exists, harmless to enable early
+eks_ready = false
+
+# Leave empty to skip the SNS email subscription for now
+alert_email = ""
+
+cpu_alarm_threshold    = 80
+memory_alarm_threshold = 80
+
+db_name              = "taskmanager"
+db_username          = "postgres"
+db_instance_class    = "db.t4g.micro"
+db_allocated_storage = 20
+db_multi_az          = false
+
+# Both true/false on purpose: this is a personal project, no data here is
+# worth keeping, and it must be destroyable end-to-end without manual
+# snapshot cleanup or an RDS deletion-protection override.
+db_skip_final_snapshot = true
+db_deletion_protection = false
+
+# Leave empty until the ALB or CloudFront URL exists
+s3_allowed_origins = []
+
+# Format: owner/repo, e.g. "jdupont/task-manager-cloud" - same value as shared/terraform.tfvars
+github_repository = "REPLACE_WITH_YOUR_GITHUB_USERNAME/task-manager-cloud"
+
+# Must be "production" (the GitHub Environment with the required reviewer),
+# NOT "prod" - it is not the same value as var.environment above. This is
+# what the OIDC trust policy checks against.
+github_environment = "production"

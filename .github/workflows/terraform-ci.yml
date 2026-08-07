@@ -21,6 +21,7 @@ jobs:
           - bootstrap
           - shared
           - environments/staging
+          - environments/staging-eks
     defaults:
       run:
         working-directory: infra/${{ matrix.module }}

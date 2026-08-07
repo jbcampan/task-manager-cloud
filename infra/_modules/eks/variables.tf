@@ -1,5 +1,5 @@
 variable "project_name" {
-  description = "Project name, used in resource naming (\"${project_name}-${environment}\")."
+  description = "Project name, used in resource naming (\"$${project_name}-$${environment}\")."
   type        = string
 }
 

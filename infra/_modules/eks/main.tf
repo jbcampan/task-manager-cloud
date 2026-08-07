@@ -30,7 +30,7 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
 resource "aws_kms_key" "eks_secrets" {
   count                   = var.enable_secrets_encryption ? 1 : 0
   description             = "Envelope encryption key for ${local.cluster_name} EKS Secrets"
-  deletion_window_in_days = 0
+  deletion_window_in_days = 7
   tags                    = var.tags
 }
 

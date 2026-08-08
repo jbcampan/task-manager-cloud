@@ -37,3 +37,8 @@ output "node_group_status" {
   description = "Node group status - should read ACTIVE after apply."
   value       = module.eks.node_group_status
 }
+
+output "backend_irsa_role_arn" {
+  description = "IAM role ARN for the backend pods' ServiceAccount - annotate it with eks.amazonaws.com/role-arn in the M2 manifests."
+  value       = module.irsa_backend.role_arn
+}

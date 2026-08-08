@@ -20,3 +20,24 @@ module "eks" {
 
   tags = local.common_tags
 }
+
+module "irsa_backend" {
+  source = "../../_modules/irsa-role"
+
+  role_name            = "${var.project_name}-${var.environment}-backend-sa"
+  namespace            = "task-manager"
+  service_account_name = "backend"
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+
+  # Reuses the managed policy already attached to the ECS task role (staging/S3
+  # module) - the S3 access requirements for uploads are identical regardless
+  # of the compute platform. Secrets Manager (JWT, RDS) is intentionally excluded
+  # here - this depends on whether we use native Kubernetes Secrets or the
+  # External Secrets Operator.
+
+  policy_arns = [data.terraform_remote_state.staging.outputs.uploads_rw_policy_arn]
+
+  tags = local.common_tags
+}

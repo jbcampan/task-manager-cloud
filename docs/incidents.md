@@ -160,3 +160,36 @@ trace back to the same deliberate choice: optimize staging/prod for fast, cheap 
 cycles rather than long-term stability the way a real production environment would be. That choice
 has a cost in occasional friction — the kind documented here — which is better understood and
 explainable than pretended away.
+
+---
+
+## 5. EKS node group stuck in `CREATING` — instance type not Free Tier eligible
+
+**Context**: first `terraform apply` of the M1.2 node group (`t3.medium`, then retried with
+`ON_DEMAND` instead of `SPOT`). The node group stayed in `CREATING` for tens of minutes with the
+underlying Auto Scaling Group's desired capacity never reached - `0` EC2 instances running against a
+desired count of `2`.
+
+**Root cause**: AWS accounts created on or after July 15, 2025 are restricted to a fixed list of
+Free-Tier-eligible instance types (`t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`,
+`c7i-flex.large`, `m7i-flex.large`) - unlike the older Free Tier model, usage beyond this list isn't
+billed at standard rates, it's rejected outright at the EC2 API level
+(`InvalidParameterCombination: "The specified instance type is not eligible for Free Tier"`). The
+initial hypothesis (a Spot-specific issue) was ruled out: `ON_DEMAND` failed with the exact same
+error, confirming the restriction applies to the instance type itself, independent of purchase
+option.
+
+**Fix**: `node_instance_types` changed to `["m7i-flex.large"]` - Free-Tier-eligible (i.e. AWS allows
+launching it at all on this restricted account), x86_64 (no AMI change needed), and with
+meaningfully more headroom (8 GiB RAM) than the also-eligible `t3.small` (2 GiB). Note "eligible" is
+not "equal cost": m7i-flex.large runs ~4x more per hour than t3.small, both drawing down the same
+sign-up credit pool - an acceptable tradeoff here since the absolute difference is a few cents per
+apply/verify/destroy session, dwarfed by the EKS control plane's own hourly cost.
+
+**Lesson**: same failure-mode class as incident #1 (RDS `FreeTierRestrictionError`) - an
+account-level restriction enforced only by the real API, invisible to `terraform plan`, and easy to
+misdiagnose as a symptom of the wrong mechanism (Spot capacity here, backup retention syntax there)
+before checking the raw error message. Worth checking Free-Tier-eligible instance types
+(`aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true`) before choosing
+any EC2-backed instance type on a newer AWS account, the same way engine/backup-retention defaults
+were checked against RDS's real limits in incident #1.

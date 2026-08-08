@@ -32,3 +32,8 @@ output "oidc_provider_url" {
   description = "OIDC issuer URL without the https:// prefix, for IRSA trust policy conditions"
   value       = module.eks.oidc_provider_url
 }
+
+output "node_group_status" {
+  description = "Node group status - should read ACTIVE after apply."
+  value       = module.eks.node_group_status
+}

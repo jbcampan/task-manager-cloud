@@ -29,3 +29,31 @@ variable "kubernetes_version" {
   description = "EKS Kubernetes version, \"major.minor\" (e.g. \"1.30\"). See infra/_modules/eks/variables.tf for the standard-support-window cost rationale - verify before every apply."
   type        = string
 }
+
+variable "node_desired_size" {
+  description = "Desired worker node count for staging-eks"
+  type        = number
+  default     = 2
+}
+
+variable "node_min_size" {
+  type    = number
+  default = 1
+}
+
+variable "node_max_size" {
+  type    = number
+  default = 3
+}
+
+variable "node_instance_types" {
+  description = "See infra/_modules/eks/variables.tf for the Free-Tier-eligibility vs cost rationale (eligible ≠ equal price)."
+  type        = list(string)
+  default     = ["m7i-flex.large"]
+}
+
+variable "node_capacity_type" {
+  description = "SPOT for staging (cost), ON_DEMAND recommended if this were ever a real prod cluster."
+  type        = string
+  default     = "SPOT"
+}

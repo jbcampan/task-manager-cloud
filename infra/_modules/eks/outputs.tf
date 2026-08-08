@@ -32,3 +32,18 @@ output "oidc_provider_url" {
   description = "OIDC issuer URL without the \"https://\" prefix, as required in IRSA trust policy Federated principals and StringEquals conditions."
   value       = replace(aws_iam_openid_connect_provider.eks.url, "https://", "")
 }
+
+output "node_group_arn" {
+  description = "ARN of the managed node group."
+  value       = aws_eks_node_group.this.arn
+}
+
+output "node_group_status" {
+  description = "Node group status - check for ACTIVE before running kubectl validation."
+  value       = aws_eks_node_group.this.status
+}
+
+output "node_role_arn" {
+  description = "IAM role ARN used by worker nodes."
+  value       = aws_iam_role.node.arn
+}

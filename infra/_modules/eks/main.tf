@@ -108,6 +108,16 @@ resource "aws_eks_cluster" "this" {
     }
   }
 
+  # Access Entries API (modern approach) instead of the legacy aws-auth ConfigMap:
+  #
+  # The IAM principal running this Terraform configuration is automatically
+  # granted cluster-admin permissions, avoiding the need for manual ConfigMap
+  # changes just to perform the initial `kubectl get nodes`.
+  access_config {
+    authentication_mode                         = "API"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   tags = var.tags
 
   depends_on = [

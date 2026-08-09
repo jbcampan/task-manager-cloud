@@ -193,3 +193,32 @@ before checking the raw error message. Worth checking Free-Tier-eligible instanc
 (`aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true`) before choosing
 any EC2-backed instance type on a newer AWS account, the same way engine/backup-retention defaults
 were checked against RDS's real limits in incident #1.
+
+---
+
+## 6. `kubectl` "Unauthorized" / DNS failure after cluster recreation — stale kubeconfig endpoint
+
+**Context**: `kubectl get nodes` after a fresh `terraform apply` of `staging-eks`, following an
+earlier `destroy`/`apply` cycle.
+
+**Symptom**: the EKS console showed `Unauthorized` under Nodes, and `kubectl` failed with a DNS
+resolution error (`no such host`) - not a typical permissions error message, despite the console
+wording suggesting one.
+
+**Root cause**: the EKS API server endpoint hostname embeds a hash generated fresh at **cluster
+creation time** (`<hash>.gr7.<region>.eks.amazonaws.com`) - it is not stable across destroy/recreate
+cycles, even when the cluster name is unchanged. The local kubeconfig, written by an earlier
+`aws eks update-kubeconfig` run against the _previous_ cluster incarnation, still pointed at a
+hostname that no longer existed - confirmed by a direct DNS lookup returning `Non-existent domain`.
+IAM permissions (the Access Entry, `AmazonEKSClusterAdminPolicy`) were never the issue, despite the
+misleading `Unauthorized` message in the console.
+
+**Fix**: regenerate the kubeconfig against the current cluster:
+
+​`bash aws eks update-kubeconfig --region eu-west-3 --name task-manager-staging-eks kubectl get nodes ​`
+
+**Lesson**: specific to the apply/destroy/apply workflow used throughout this project (incidents #1,
+#3, #5 share the same root cause category - defaults built for a stable, long-lived cluster clashing
+with a deliberately short-lived one). `aws eks update-kubeconfig` should be run as a standard step
+right after _every_ `terraform apply` of `staging-eks` going forward, not only the first time -
+already reflected in the M1 command sequences, worth keeping as a reflex for M2 onward too.

@@ -141,8 +141,8 @@ variable "node_instance_types" {
     negligible next to the EKS control plane's own ~$0.10/h. See
     docs/incidents.md #5.
   EOT
-  type    = list(string)
-  default = ["m7i-flex.large"]
+  type        = list(string)
+  default     = ["m7i-flex.large"]
 }
 
 variable "node_disk_size" {

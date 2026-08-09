@@ -41,3 +41,21 @@ module "irsa_backend" {
 
   tags = local.common_tags
 }
+
+module "alb_controller" {
+  source = "../../_modules/alb-controller"
+
+  cluster_name = module.eks.cluster_name
+  aws_region   = var.aws_region
+  vpc_id       = data.terraform_remote_state.staging.outputs.vpc_id
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+  chart_version     = "3.4.1" # controller v3.4.1 - verified with `helm search repo eks/aws-load-balancer-controller --versions`
+
+  tags = local.common_tags
+
+  # The controller requires the worker nodes and their networking 
+  # to be fully operational before its own pod can be scheduled.
+  depends_on = [module.eks]
+}

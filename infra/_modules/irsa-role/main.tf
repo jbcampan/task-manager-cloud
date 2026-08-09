@@ -37,7 +37,7 @@ resource "aws_iam_role" "this" {
 }
 
 resource "aws_iam_role_policy_attachment" "managed" {
-  for_each   = toset(var.policy_arns)
+  for_each   = { for idx, arn in var.policy_arns : idx => arn }
   role       = aws_iam_role.this.name
   policy_arn = each.value
 }

@@ -42,3 +42,8 @@ output "backend_irsa_role_arn" {
   description = "IAM role ARN for the backend pods' ServiceAccount - annotate it with eks.amazonaws.com/role-arn in the M2 manifests."
   value       = module.irsa_backend.role_arn
 }
+
+output "alb_controller_role_arn" {
+  description = "IAM role ARN for the AWS Load Balancer Controller."
+  value       = module.alb_controller.role_arn
+}

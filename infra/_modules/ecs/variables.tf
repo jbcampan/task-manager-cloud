@@ -40,6 +40,11 @@ variable "master_user_secret_arn" {
   type        = string
 }
 
+variable "jwt_secret_arn" {
+  description = "Secrets Manager ARN holding the JWT signing secret (from the app-secrets module)"
+  type        = string
+}
+
 variable "uploads_rw_policy_arn" {
   description = "IAM policy ARN for read/write access to the uploads bucket (from the s3 module), attached to the ECS task role"
   type        = string

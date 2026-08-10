@@ -32,7 +32,7 @@ data "aws_iam_policy_document" "execution_secrets" {
     actions = ["secretsmanager:GetSecretValue"]
     resources = [
       var.master_user_secret_arn,
-      aws_secretsmanager_secret.jwt.arn,
+      var.jwt_secret_arn,
     ]
   }
 }

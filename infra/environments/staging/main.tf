@@ -39,6 +39,19 @@ module "s3" {
   tags            = local.common_tags
 }
 
+# Extracted from _modules/ecs/secrets.tf (EKS migration) - application
+# secret, not an ECS-platform concern. Instantiated at the same level as vpc
+# and s3 (not nested inside module.ecs) so it can be created and targeted
+# independently: `terraform apply -target=module.vpc -target=module.s3
+# -target=module.app_secrets` no longer requires deploying ECS at all.
+module "app_secrets" {
+  source = "../../_modules/app-secrets"
+
+  environment  = var.environment
+  project_name = var.project_name
+  tags         = local.common_tags
+}
+
 module "iam_oidc" {
   source = "../../_modules/iam-oidc"
 
@@ -87,6 +100,7 @@ module "ecs" {
   db_name                     = module.rds.db_name
   db_username                 = module.rds.db_username
   master_user_secret_arn      = module.rds.master_user_secret_arn
+  jwt_secret_arn              = module.app_secrets.jwt_secret_arn # now received, not created internally
   uploads_bucket_id           = module.s3.bucket_id
   uploads_rw_policy_arn       = module.s3.uploads_rw_policy_arn
   cookie_secure               = false # flip to true once HTTPS/ACM is added in front of the ALB

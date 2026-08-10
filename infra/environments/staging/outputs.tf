@@ -88,6 +88,11 @@ output "master_user_secret_arn" {
   value       = module.rds.master_user_secret_arn
 }
 
+output "jwt_secret_arn" {
+  description = "Secrets Manager ARN holding the JWT signing secret - required by staging-eks/main.tf (module.external_secrets) to scope the External Secrets Operator's IRSA read policy. Sourced from module.app_secrets (not module.ecs) so it resolves even when only `-target=module.vpc -target=module.s3 -target=module.app_secrets` has been applied - no ECS deployment required."
+  value       = module.app_secrets.jwt_secret_arn
+}
+
 output "uploads_bucket_id" {
   description = "S3 uploads bucket name"
   value       = module.s3.bucket_id

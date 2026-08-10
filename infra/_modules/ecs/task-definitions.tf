@@ -37,7 +37,7 @@ resource "aws_ecs_task_definition" "backend" {
       secrets = [
         { name = "DB_USERNAME", valueFrom = "${var.master_user_secret_arn}:username::" },
         { name = "DB_PASSWORD", valueFrom = "${var.master_user_secret_arn}:password::" },
-        { name = "JWT_SECRET", valueFrom = aws_secretsmanager_secret.jwt.arn },
+        { name = "JWT_SECRET", valueFrom = var.jwt_secret_arn },
       ]
 
       logConfiguration = {

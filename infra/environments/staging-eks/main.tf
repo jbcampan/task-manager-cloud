@@ -59,3 +59,26 @@ module "alb_controller" {
   # to be fully operational before its own pod can be scheduled.
   depends_on = [module.eks]
 }
+
+module "external_secrets" {
+  source = "../../_modules/external-secrets-operator"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+  chart_version     = "2.6.0" # verified with `helm search repo external-secrets/external-secrets --versions`
+
+  # Both confirmed against the real staging/outputs.tf. jwt_secret_arn
+  # required adding a new output at two levels (_modules/ecs/outputs.tf and
+  # staging/outputs.tf) - it didn't exist before, see the M2.1 changelog.
+  secret_arns = [
+    data.terraform_remote_state.staging.outputs.jwt_secret_arn,
+    data.terraform_remote_state.staging.outputs.master_user_secret_arn,
+  ]
+
+  tags = local.common_tags
+
+  depends_on = [module.eks]
+}

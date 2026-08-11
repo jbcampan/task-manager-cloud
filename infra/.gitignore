@@ -10,3 +10,9 @@ crash.*.log
 # Real variable values (contain no secrets here, but kept out of git by convention)
 *.tfvars
 !*.tfvars.example
+
+# Generated Kubernetes manifests (staging-eks/k8s-manifests.tf renders these
+# from k8s-templates/*.tftpl at apply time) - derived output, not source.
+# Committing them would let them silently drift from the templates that
+# actually generate them.
+**/k8s-generated/

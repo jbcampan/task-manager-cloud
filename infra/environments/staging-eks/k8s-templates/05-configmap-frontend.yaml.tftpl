@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: task-manager
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Anticipates the backend Service created in M2.4 - pods deployed from
+  # M2.3 alone cannot actually resolve this hostname yet. Expected until
+  # the Service exists; not a bug in this file.
+  API_URL: "http://backend.task-manager.svc.cluster.local:3001/api/v1"
+  # Same placeholder logic as COOKIE_SECURE in the ECS deployment (see
+  # incidents.md #4) - false until HTTPS/ACM sits in front of the ALB.
+  COOKIE_SECURE: "false"

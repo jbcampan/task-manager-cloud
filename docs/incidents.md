@@ -222,3 +222,204 @@ misleading `Unauthorized` message in the console.
 with a deliberately short-lived one). `aws eks update-kubeconfig` should be run as a standard step
 right after _every_ `terraform apply` of `staging-eks` going forward, not only the first time -
 already reflected in the M1 command sequences, worth keeping as a reflex for M2 onward too.
+
+---
+
+## 7. `terraform destroy` blocked on `staging` — the ALB and its security groups exist outside Terraform's state
+
+**Context**: destroying the environment at the end of manifests Kubernetes test session,
+`staging-eks` first, then `staging`.
+
+**Symptom**: `terraform destroy` on `staging` hangs or fails while trying to remove the VPC/subnets
+
+- some security groups and an Application Load Balancer, never created by any Terraform resource in
+  this project, are still attached.
+
+**Root cause**: the `Ingress` resources are provisioned with `target-type: ip` by the AWS Load
+Balancer Controller, a pod running _inside_ the EKS cluster - it creates the ALB and two security
+groups directly via the AWS API, entirely outside Terraform's state. Terraform has no idea these
+resources exist, so it can't destroy them, and the VPC destroy fails while they're still attached to
+it.
+
+**Fix**: let the controller clean up after itself _before_ touching Terraform state, in this order:
+
+```bash
+# 1. Delete the Ingress resources - the controller tears down the ALB and
+#    its security groups in response, typically within ~1 minute
+kubectl delete -f infra/environments/staging-eks/k8s-generated/12-ingress-backend.yaml \
+               -f infra/environments/staging-eks/k8s-generated/13-ingress-frontend.yaml
+
+# 2. Confirm in the EC2/VPC console that the ALB and its SGs are gone, then:
+cd infra/environments/staging-eks && terraform destroy
+cd ../staging && terraform destroy
+```
+
+**Lesson**: same failure-mode class as incidents #1/#5/#6 - a resource genuinely exists in AWS but
+is invisible to `terraform plan`/`destroy`. This time not an account-level restriction, but a
+Kubernetes controller managing AWS resources on Terraform's behalf without Terraform ever knowing.
+Any AWS Load Balancer Controller Ingress with `target-type: ip` needs this manual pre-destroy step
+until it's scripted away.
+
+---
+
+## 8. RDS refused connections from EKS nodes — Prisma `P1001`
+
+**Context**: first working backend deployment attempt on EKS staging, after the application-level
+configuration was in place.
+
+**Symptom**: backend pods started, but couldn't reach the database:
+
+```
+PrismaClientInitializationError:
+Can't reach database server at `task-manager-staging-db...rds.amazonaws.com:5432`
+errorCode: 'P1001'
+```
+
+**Root cause**: RDS's security group only ever authorized the ECS task security group - set up
+before the EKS migration existed. EKS worker nodes carry a different security group
+(`module.eks.cluster_security_group_id`), never granted ingress on port 5432.
+
+**Fix**:
+
+```hcl
+# infra/environments/staging-eks/security.tf
+resource "aws_vpc_security_group_ingress_rule" "rds_from_eks" {
+  security_group_id            = data.terraform_remote_state.staging.outputs.rds_security_group_id
+  description                  = "PostgreSQL from EKS worker nodes"
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = module.eks.cluster_security_group_id
+}
+```
+
+**Lesson**: migrating compute platforms while keeping a shared VPC-level resource like RDS requires
+explicitly re-authorizing the new platform's security group - nothing does this automatically. The
+old ECS rule staying in place actively hides the gap: RDS still "works" for ECS, so a health check
+against the database in isolation gives no signal that a different compute platform is silently
+blocked.
+
+---
+
+## 9. `DATABASE_URL` composed by External Secrets was silently discarded — `entrypoint.sh` rebuilds it itself
+
+**Context**: the Kubernetes configuration was designed assuming the backend reads `DATABASE_URL`
+directly from the environment, matching the single-variable pattern already used in
+`docker-compose.yml` for local development. The RDS `ExternalSecret` was built accordingly,
+composing `DATABASE_URL` via ExternalSecrets Operator's own templating feature.
+
+**Symptom**: the composed `DATABASE_URL` was correct in the resulting Kubernetes Secret, but had no
+effect on the running application.
+
+**Root cause**: `apps/backend/entrypoint.sh` - the Docker image's actual `ENTRYPOINT` - rebuilds
+`DATABASE_URL` itself at every container start, from `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`
+and `DB_PASSWORD` (URL-encoding the password in the process), and unconditionally overwrites
+whatever `DATABASE_URL` was already present in the environment:
+
+```sh
+# apps/backend/entrypoint.sh
+DB_PASSWORD_ENCODED=$(node -e "console.log(encodeURIComponent(process.env.DB_PASSWORD))")
+export DATABASE_URL="postgresql://${DB_USERNAME}:${DB_PASSWORD_ENCODED}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+```
+
+The `docker-compose.yml` pattern (a single `DATABASE_URL` variable, no entrypoint transformation)
+does not reflect how the production Docker image actually behaves - the two were never equivalent to
+begin with, but nothing surfaced that until this migration.
+
+**Fix**: removed the now-dead `DATABASE_URL` composition from the `ExternalSecret`'s
+`target.template`. Added `DB_HOST`, `DB_PORT`, `DB_NAME` as explicit environment variables on both
+the backend `Deployment` and the migration `Job` (incident #10), matching what `entrypoint.sh`
+actually requires.
+
+**Lesson**: an assumption carried over from a simpler local-dev configuration turned out not to
+match the real production image's behavior - the discrepancy was invisible from the Kubernetes side
+alone, since the Secret itself looked completely correct. Reading the entrypoint script directly
+settled it in one look, after a design built for several steps on an unverified assumption.
+
+---
+
+## 10. Migration `Job` used the wrong override field — `command` bypassed `entrypoint.sh` entirely
+
+**Context**: adding a one-off Kubernetes `Job` to run `prisma migrate deploy`, mirroring the one-off
+ECS task already used for the same purpose in `deploy-reusable.yml`.
+
+**Symptom**: would have failed with `Environment variable not found: DATABASE_URL` - the same error
+already hit once via a manual `kubectl exec` attempt - since nothing would build `DATABASE_URL` for
+the migration to use.
+
+**Root cause**: Kubernetes' `command:` field on a container overrides the image's Docker
+`ENTRYPOINT`, not just its `CMD`. `entrypoint.sh` _is_ the `ENTRYPOINT` - the script that builds
+`DATABASE_URL` before doing `exec "$@"`. Setting `command:` on the migration `Job` bypassed
+`entrypoint.sh` completely. ECS's `containerOverrides.command` (used by `deploy-reusable.yml`) does
+not behave the same way - it only replaces `CMD`, since ECS's separate `entryPoint` field is never
+touched by that override.
+
+**Fix**: switched the `Job` from `command:` to `args:`, which overrides only `CMD` in Kubernetes and
+leaves `entrypoint.sh` in charge:
+
+```yaml
+# infra/environments/staging-eks/k8s-templates/21-job-migrate.yaml.tftpl
+args: ['node', 'node_modules/prisma/build/index.js', 'migrate', 'deploy']
+```
+
+**Lesson**: Kubernetes and ECS have different override semantics for what sounds like the same
+concept ("override the command"). Porting an ECS pattern to Kubernetes literally, without checking
+that semantic difference, reproduces a bug that looks identical to incident #9 (missing
+`DATABASE_URL`) but has a completely different root cause.
+
+---
+
+## 11. Fresh EKS clusters install `vpc-cni` self-managed — `import` doesn't survive a destroy/recreate
+
+**Context**: bringing the `vpc-cni` addon under Terraform management to enable
+`enableNetworkPolicy`, a prerequisite for any `NetworkPolicy` to actually be enforced.
+
+**Symptom**: `aws_eks_addon.vpc_cni` failed to create with `ResourceInUseException` on a freshly
+created cluster - even though the exact same resource had already been imported successfully once,
+on a previous incarnation of the cluster.
+
+**Root cause**: EKS auto-installs `vpc-cni` as a self-managed component at cluster creation by
+default, without registering it via the Addon API. A plain Terraform "create" call collides with
+that existing installation. `terraform import` resolved this once, but an addon's identity is tied
+to its cluster's ARN - it does not survive a `destroy`/`apply` cycle, so the same manual import
+would need repeating on every single new cluster.
+
+**Fix**:
+
+```hcl
+# infra/_modules/eks/addons.tf
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "vpc-cni"
+
+  # Adopts whatever's already running at creation time automatically -
+  # no manual import needed, works identically on every fresh cluster.
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  configuration_values = jsonencode({
+    enableNetworkPolicy = "true"
+  })
+
+  tags = var.tags
+}
+```
+
+**Lesson**: same failure-mode class as incidents #1/#3/#5/#6 - a default built for a stable,
+long-lived cluster (import once, done) clashing with this project's deliberately short-lived
+destroy/apply workflow. The durable fix isn't "remember to import every time" - it's making the
+resource's creation itself idempotent regardless of what already exists on the cluster.
+
+---
+
+## Why these eleven share a common thread
+
+Most of the incidents above trace back to the same underlying tension: optimizing staging/prod for
+fast, cheap `destroy`/`apply` cycles rather than long-term stability the way a real production
+environment would be. AWS's and EKS's defaults are built for the opposite assumption - a cluster or
+secret that's created once and lives for months. That mismatch has a recurring cost - the kind
+documented here - which is better understood and explained than pretended away. The remaining
+incidents (#7, #9, #10) are specific to the ECS→EKS migration itself: assumptions and patterns that
+held on one platform (Terraform-tracked load balancers, a single `DATABASE_URL` variable, identical
+command-override semantics) didn't automatically carry over to the other, and each gap only surfaced
+by actually running the migration end to end.

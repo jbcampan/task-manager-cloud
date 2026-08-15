@@ -105,6 +105,47 @@ resource "local_file" "ingress_frontend" {
   content  = file("${path.module}/k8s-templates/13-ingress-frontend.yaml")
 }
 
+resource "local_file" "networkpolicy_default_deny" {
+  filename = "${path.module}/k8s-generated/14-networkpolicy-default-deny.yaml"
+  content  = file("${path.module}/k8s-templates/14-networkpolicy-default-deny.yaml")
+}
+
+resource "local_file" "networkpolicy_dns_egress" {
+  filename = "${path.module}/k8s-generated/15-networkpolicy-dns-egress.yaml"
+  content  = file("${path.module}/k8s-templates/15-networkpolicy-dns-egress.yaml")
+}
+
+resource "local_file" "networkpolicy_frontend_to_backend_ingress" {
+  filename = "${path.module}/k8s-generated/16-networkpolicy-frontend-to-backend-ingress.yaml"
+  content  = file("${path.module}/k8s-templates/16-networkpolicy-frontend-to-backend-ingress.yaml")
+}
+
+resource "local_file" "networkpolicy_frontend_to_backend_egress" {
+  filename = "${path.module}/k8s-generated/17-networkpolicy-frontend-to-backend-egress.yaml"
+  content  = file("${path.module}/k8s-templates/17-networkpolicy-frontend-to-backend-egress.yaml")
+}
+
+resource "local_file" "networkpolicy_alb_to_backend" {
+  filename = "${path.module}/k8s-generated/18-networkpolicy-alb-to-backend.yaml"
+  content = templatefile("${path.module}/k8s-templates/18-networkpolicy-alb-to-backend.yaml.tftpl", {
+    vpc_cidr = data.terraform_remote_state.staging.outputs.vpc_cidr
+  })
+}
+
+resource "local_file" "networkpolicy_alb_to_frontend" {
+  filename = "${path.module}/k8s-generated/19-networkpolicy-alb-to-frontend.yaml"
+  content = templatefile("${path.module}/k8s-templates/19-networkpolicy-alb-to-frontend.yaml.tftpl", {
+    vpc_cidr = data.terraform_remote_state.staging.outputs.vpc_cidr
+  })
+}
+
+resource "local_file" "networkpolicy_backend_egress_external" {
+  filename = "${path.module}/k8s-generated/20-networkpolicy-backend-egress-external.yaml"
+  content = templatefile("${path.module}/k8s-templates/20-networkpolicy-backend-egress-external.yaml.tftpl", {
+    vpc_cidr = data.terraform_remote_state.staging.outputs.vpc_cidr
+  })
+}
+
 resource "local_file" "job_migrate" {
   filename = "${path.module}/k8s-generated/21-job-migrate.yaml"
   content = templatefile("${path.module}/k8s-templates/21-job-migrate.yaml.tftpl", {

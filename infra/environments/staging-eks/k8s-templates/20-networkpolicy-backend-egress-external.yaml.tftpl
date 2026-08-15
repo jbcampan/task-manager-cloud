@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-egress-external
+  namespace: task-manager
+spec:
+  # Targets db-access, not app: backend - the migration Job (21-job-migrate)
+  # needs this same egress but must never carry app: backend, which is also
+  # the Service's selector (10-service-backend.yaml). See the label comment
+  # in 08-deployment-backend.yaml.tftpl.
+  podSelector:
+    matchLabels:
+      db-access: "true"
+  policyTypes:
+    - Egress
+  egress:
+    # RDS lives in this VPC's private subnets, not as a pod - ipBlock
+    # again, scoped to the VPC CIDR since the exact private subnet range
+    # isn't currently exposed as an output either (same gap as the ALB
+    # rules above).
+    - to:
+        - ipBlock:
+            cidr: ${vpc_cidr}
+      ports:
+        - protocol: TCP
+          port: 5432
+    # S3 (uploads bucket) traffic leaves the VPC entirely via the NAT
+    # Gateway - no VPC endpoint for S3 (a deliberate architecture
+    # choice.
+    # Restricting this further would mean keeping AWS's published IP-range
+    # JSON in sync with this policy - out of scope here, so this stays
+    # 0.0.0.0/0 on 443 as a known, documented gap rather than a silent one.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443

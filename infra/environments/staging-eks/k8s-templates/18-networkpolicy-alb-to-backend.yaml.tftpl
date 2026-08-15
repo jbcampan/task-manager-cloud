@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alb-ingress-backend
+  namespace: task-manager
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Traffic from the ALB (target-type: ip) arrives directly
+    # at pod IPs from ALB ENIs living in this VPC - not from another pod,
+    # so this must be an ipBlock, not a podSelector. Scoped to the whole
+    # VPC CIDR rather than a narrower subnet range, since the ALB
+    # Controller can place ENIs across any subnet it's configured for and
+    # that exact range isn't exposed as a stable Terraform output today.
+    - from:
+        - ipBlock:
+            cidr: ${vpc_cidr}
+      ports:
+        - protocol: TCP
+          port: 3001

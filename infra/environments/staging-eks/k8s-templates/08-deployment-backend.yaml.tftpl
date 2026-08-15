@@ -19,6 +19,13 @@ spec:
     metadata:
       labels:
         app: backend
+        # Separate from "app: backend" on purpose - that label is also the
+        # Service's selector (10-service-backend.yaml). This one exists
+        # only so the egress NetworkPolicy can target "anything that
+        # talks to RDS/S3", including the one-off migration Job,
+        # without accidentally putting that Job's pod into the Service's
+        # load-balancing rotation.
+        db-access: "true"
     spec:
       serviceAccountName: backend
       # Matches app.enableShutdownHooks() in main.ts - gives NestJS time to
@@ -36,6 +43,18 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 3001
+          # apps/backend/entrypoint.sh rebuilds DATABASE_URL itself at
+          # container start from these 5 values (DB_USERNAME/DB_PASSWORD
+          # come from the Secret via envFrom below) and overwrites any
+          # DATABASE_URL already in the environment - so these three are
+          # required even though the app code never reads them directly.
+          env:
+            - name: DB_HOST
+              value: "${db_host}"
+            - name: DB_PORT
+              value: "${db_port}"
+            - name: DB_NAME
+              value: "${db_name}"
           envFrom:
             - configMapRef:
                 name: backend-config

@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: task-manager
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # Same shared ALB as backend-ingress. Higher group.order = lower
+    # priority = evaluated after /api, so this catch-all never shadows it.
+    alb.ingress.kubernetes.io/group.name: task-manager
+    alb.ingress.kubernetes.io/group.order: '20'
+    # No dedicated health route in the Next.js app (see the same caveat in
+    # 09-deployment-frontend.yaml.tftpl) - probing "/" is a pragmatic
+    # stand-in here too, for consistency.
+    alb.ingress.kubernetes.io/healthcheck-path: /
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000

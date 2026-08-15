@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Suffixed by the image tag's short SHA - a Job's pod template is
+  # immutable, so re-running for a NEW image needs a new name anyway.
+  # Re-applying for the SAME tag is a safe no-op (identical spec).
+  name: backend-migrate-${image_tag_short}
+  namespace: task-manager
+spec:
+  # No automatic retries - a partially-applied or failed migration retried
+  # blindly can make schema drift worse, not better. Same philosophy as
+  # deploy-reusable.yml's explicit exit-code check on the ECS one-off task,
+  # not a blind ecs wait retry.
+  backoffLimit: 0
+  # Keeps the Job (and its logs) around for inspection, then auto-cleans up
+  # rather than accumulating one Job per deploy forever.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        db-access: "true"
+    spec:
+      serviceAccountName: backend
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ${backend_image}
+          imagePullPolicy: Always
+          # args, not command: entrypoint.sh is the image's Docker
+          # ENTRYPOINT and must stay active - it's what builds DATABASE_URL
+          # from DB_HOST/DB_PORT/DB_NAME/DB_USERNAME/DB_PASSWORD before
+          # doing exec "$@". Kubernetes' "command" field would override the
+          # ENTRYPOINT itself, bypassing that logic entirely - "args"
+          # overrides only CMD, matching the ECS containerOverrides.command
+          # pattern in deploy-reusable.yml (which likewise never touches
+          # ECS's separate entryPoint field).
+          args: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
+          env:
+            - name: DB_HOST
+              value: "${db_host}"
+            - name: DB_PORT
+              value: "${db_port}"
+            - name: DB_NAME
+              value: "${db_name}"
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: task-manager-jwt-secret
+            - secretRef:
+                name: task-manager-rds-credentials

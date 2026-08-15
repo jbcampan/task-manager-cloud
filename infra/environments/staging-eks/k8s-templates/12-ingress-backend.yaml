@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+  namespace: task-manager
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Routes directly to pod IPs (via VPC CNI) instead of NodePort - more
+    # accurate health checks, standard choice regardless of EC2 vs Fargate
+    # node group (this cluster uses EC2 SPOT, per M1 node_group.tf).
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # No ACM cert / HTTPS listener yet - same posture as the ECS ALB
+    # (incidents.md #4, COOKIE_SECURE tied to a real env var, not NODE_ENV).
+    # group.name merges this with frontend-ingress onto a single ALB.
+    # group.order controls rule priority within that shared ALB - lower
+    # evaluates first, so /api is matched before the frontend's catch-all /.
+    alb.ingress.kubernetes.io/group.name: task-manager
+    alb.ingress.kubernetes.io/group.order: '10'
+    # Reuses the same route as the NestJS TerminusModule readiness probe
+    # (global prefix "api" + URI versioning "v1" from main.ts).
+    alb.ingress.kubernetes.io/healthcheck-path: /api/v1/health/ready
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 3001

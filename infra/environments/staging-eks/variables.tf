@@ -57,3 +57,16 @@ variable "node_capacity_type" {
   type        = string
   default     = "SPOT"
 }
+
+variable "image_tag" {
+  description = <<-EOT
+    Docker image tag (commit SHA) to deploy on EKS - backend and frontend
+    share the same tag. Not auto-resolved from ECR's most recent push: EKS
+    has no CD job of its own yet (cd.yml only deploys to ECS), so "most
+    recent" would silently mean "whatever ECS last deployed" - an implicit
+    coupling, not a real guarantee. Pick a SHA you've confirmed exists in
+    both ECR repos (`aws ecr describe-images --repository-name ...`) and
+    set it explicitly in terraform.tfvars.
+  EOT
+  type        = string
+}

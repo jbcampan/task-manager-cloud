@@ -8,10 +8,13 @@
 # secrets before configmaps before deployments).
 
 locals {
-  # image_tag is explicit, not auto-resolved - see variables.tf for why
-  # `most_recent` on aws_ecr_image was rejected here.
+  # "latest" is never used - image_tag is explicit, see variables.tf.
   backend_image  = "${data.terraform_remote_state.staging.outputs.ecr_backend_repository_url}:${var.image_tag}"
   frontend_image = "${data.terraform_remote_state.staging.outputs.ecr_frontend_repository_url}:${var.image_tag}"
+  # Job names are immutable once created - a short SHA suffix lets a new
+  # image tag get a fresh Job without colliding with a previous migration
+  # run, while re-applying the same tag stays a safe no-op.
+  image_tag_short = substr(var.image_tag, 0, 7)
 }
 
 resource "local_file" "namespace" {
@@ -37,8 +40,6 @@ resource "local_file" "external_secret_rds" {
   filename = "${path.module}/k8s-generated/03-external-secret-rds.yaml"
   content = templatefile("${path.module}/k8s-templates/03-external-secret-rds.yaml.tftpl", {
     rds_secret_arn = data.terraform_remote_state.staging.outputs.master_user_secret_arn
-    db_host        = data.terraform_remote_state.staging.outputs.db_instance_address
-    db_name        = data.terraform_remote_state.staging.outputs.db_name
   })
 }
 
@@ -71,6 +72,9 @@ resource "local_file" "deployment_backend" {
   filename = "${path.module}/k8s-generated/08-deployment-backend.yaml"
   content = templatefile("${path.module}/k8s-templates/08-deployment-backend.yaml.tftpl", {
     backend_image = local.backend_image
+    db_host       = data.terraform_remote_state.staging.outputs.db_instance_address
+    db_port       = 5432
+    db_name       = data.terraform_remote_state.staging.outputs.db_name
   })
 }
 
@@ -78,5 +82,36 @@ resource "local_file" "deployment_frontend" {
   filename = "${path.module}/k8s-generated/09-deployment-frontend.yaml"
   content = templatefile("${path.module}/k8s-templates/09-deployment-frontend.yaml.tftpl", {
     frontend_image = local.frontend_image
+  })
+}
+
+resource "local_file" "service_backend" {
+  filename = "${path.module}/k8s-generated/10-service-backend.yaml"
+  content  = file("${path.module}/k8s-templates/10-service-backend.yaml")
+}
+
+resource "local_file" "service_frontend" {
+  filename = "${path.module}/k8s-generated/11-service-frontend.yaml"
+  content  = file("${path.module}/k8s-templates/11-service-frontend.yaml")
+}
+
+resource "local_file" "ingress_backend" {
+  filename = "${path.module}/k8s-generated/12-ingress-backend.yaml"
+  content  = file("${path.module}/k8s-templates/12-ingress-backend.yaml")
+}
+
+resource "local_file" "ingress_frontend" {
+  filename = "${path.module}/k8s-generated/13-ingress-frontend.yaml"
+  content  = file("${path.module}/k8s-templates/13-ingress-frontend.yaml")
+}
+
+resource "local_file" "job_migrate" {
+  filename = "${path.module}/k8s-generated/21-job-migrate.yaml"
+  content = templatefile("${path.module}/k8s-templates/21-job-migrate.yaml.tftpl", {
+    backend_image   = local.backend_image
+    image_tag_short = local.image_tag_short
+    db_host         = data.terraform_remote_state.staging.outputs.db_instance_address
+    db_port         = 5432
+    db_name         = data.terraform_remote_state.staging.outputs.db_name
   })
 }

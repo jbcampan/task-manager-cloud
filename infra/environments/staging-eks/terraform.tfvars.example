@@ -7,3 +7,5 @@ tfstate_bucket = "REPLACE_WITH_YOUR_BUCKET_NAME"
 kubernetes_version = "1.30" # verify AWS EKS standard support window before every apply
 
 image_tag = "REPLACE_WITH_A_REAL_SHA"
+
+grafana_admin_password = "changeme"

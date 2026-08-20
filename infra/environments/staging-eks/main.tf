@@ -82,3 +82,15 @@ module "external_secrets" {
 
   depends_on = [module.eks]
 }
+
+module "kube_prometheus_stack" {
+  source = "../../_modules/kube-prometheus-stack"
+
+  chart_version          = "88.3.0" # verified with `helm search repo prometheus-community/kube-prometheus-stack --versions`
+  grafana_admin_password = var.grafana_admin_password
+
+  # Same reasoning as alb_controller/external_secrets above - node group
+  # and cluster networking must be ready before this (much larger) chart's
+  # pods, including the node-exporter DaemonSet, can schedule.
+  depends_on = [module.eks]
+}

@@ -70,3 +70,9 @@ variable "image_tag" {
   EOT
   type        = string
 }
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password for the kube-prometheus-stack deployment. Set in terraform.tfvars, never committed."
+  type        = string
+  sensitive   = true
+}

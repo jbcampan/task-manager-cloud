@@ -145,6 +145,28 @@ resource "helm_release" "kube_prometheus_stack" {
             searchNamespace = "ALL"
           }
         }
+
+        # The chart's own Ingress creation stays disabled - our own
+        # Ingress template (28-ingress-grafana.yaml) follows the same
+        # hand-written pattern already used for backend/frontend
+        # (12/13-ingress-*.yaml), sharing their ALB group rather than
+        # letting the chart provision an independent one.
+        ingress = {
+          enabled = false
+        }
+
+        # Required because Grafana is reached at /grafana on the shared
+        # ALB (path-based routing, no separate hostname configured) -
+        # without serve_from_sub_path, Grafana's own generated links,
+        # redirects, and static asset URLs would point at "/" and 404
+        # once actually hit through the Ingress.
+        "grafana.ini" = {
+          server = {
+            domain              = var.alb_hostname
+            root_url            = "%(protocol)s://%(domain)s/grafana/"
+            serve_from_sub_path = true
+          }
+        }
       }
 
       # DaemonSet - one node-exporter pod per node, scraping host-level

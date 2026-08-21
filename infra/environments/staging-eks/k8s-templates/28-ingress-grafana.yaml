@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # Shared ALB with backend-ingress/frontend-ingress - one address to
+    # give out, and one ALB to clean up before a staging-eks destroy
+    # (incident #7), not two.
+    alb.ingress.kubernetes.io/group.name: task-manager
+    # Between backend's /api (10) and frontend's catch-all / (20) - must
+    # be evaluated before the catch-all, or /grafana would never match.
+    alb.ingress.kubernetes.io/group.order: '15'
+    # Grafana's built-in health endpoint, reached with the same /grafana
+    # prefix as everything else since serve_from_sub_path is enabled -
+    # the ALB target group health check hits pod IP:port directly
+    # (bypassing Ingress path routing), so the full sub-path is required
+    # here even though the Ingress rule below also says "/grafana".
+    alb.ingress.kubernetes.io/healthcheck-path: /grafana/api/health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                # Default Service name for the grafana sub-chart under
+                # release name "kube-prometheus-stack" - confirm with
+                # `kubectl get svc -n monitoring` before first apply.
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80

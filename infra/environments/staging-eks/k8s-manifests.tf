@@ -186,3 +186,8 @@ resource "local_file" "grafana_dashboard_app_overview" {
   filename = "${path.module}/k8s-generated/27-grafana-dashboard-app-overview.yaml"
   content  = file("${path.module}/k8s-templates/27-grafana-dashboard-app-overview.yaml")
 }
+
+resource "local_file" "ingress_grafana" {
+  filename = "${path.module}/k8s-generated/28-ingress-grafana.yaml"
+  content  = file("${path.module}/k8s-templates/28-ingress-grafana.yaml")
+}

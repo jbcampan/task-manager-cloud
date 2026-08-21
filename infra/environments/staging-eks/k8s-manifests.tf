@@ -156,3 +156,23 @@ resource "local_file" "job_migrate" {
     db_name         = data.terraform_remote_state.staging.outputs.db_name
   })
 }
+
+resource "local_file" "networkpolicy_monitoring_to_backend" {
+  filename = "${path.module}/k8s-generated/22-networkpolicy-monitoring-to-backend.yaml"
+  content  = file("${path.module}/k8s-templates/22-networkpolicy-monitoring-to-backend.yaml")
+}
+
+resource "local_file" "networkpolicy_monitoring_to_frontend" {
+  filename = "${path.module}/k8s-generated/23-networkpolicy-monitoring-to-frontend.yaml"
+  content  = file("${path.module}/k8s-templates/23-networkpolicy-monitoring-to-frontend.yaml")
+}
+
+resource "local_file" "servicemonitor_backend" {
+  filename = "${path.module}/k8s-generated/24-servicemonitor-backend.yaml"
+  content  = file("${path.module}/k8s-templates/24-servicemonitor-backend.yaml")
+}
+
+resource "local_file" "servicemonitor_frontend" {
+  filename = "${path.module}/k8s-generated/25-servicemonitor-frontend.yaml"
+  content  = file("${path.module}/k8s-templates/25-servicemonitor-frontend.yaml")
+}

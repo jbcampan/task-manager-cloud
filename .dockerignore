@@ -1,8 +1,35 @@
+# Dependencies - reinstalled fresh in each build stage (npm ci), and by far
+# the largest source of build-context bloat in this npm workspaces monorepo
+# (present at the root AND inside every app, via hoisting).
 **/node_modules
+
+# Build artifacts and caches - regenerated inside the image.
 **/.next
 **/dist
 **/coverage
+
+# Terraform provider binaries can reach several hundred MB per environment
+# - irrelevant to any application image, and excluded along with the rest
+# of infra/ below, which no application Dockerfile ever needs.
+infra
+
+# Version control
 .git
+.gitignore
+
+# Env files - real secrets must never enter a build context that ends up
+# baked into an image layer, even transiently.
+**/.env*
+!**/.env.example
+
+# Editor/OS noise
+.vscode
+.idea
+**/.DS_Store
+**/npm-debug.log*
+
+# Not needed inside any application image
+.husky
+.github
 *.md
-**/.env
-**/.env.local
+docker-compose*.yml

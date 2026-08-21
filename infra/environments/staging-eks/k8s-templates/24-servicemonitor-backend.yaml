@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend
+  namespace: task-manager
+spec:
+  # No matchLabels needed here beyond app: backend - Prometheus's own
+  # serviceMonitorSelector is set to {} (match everything), so
+  # there's no release-label convention to satisfy.
+  selector:
+    matchLabels:
+      app: backend
+  namespaceSelector:
+    matchNames:
+      - task-manager
+  endpoints:
+    - port: http
+      path: /api/v1/metrics
+      interval: 15s

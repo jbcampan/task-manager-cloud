@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-ingress-backend
+  namespace: task-manager
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Scoped to the whole monitoring namespace rather than a podSelector on
+    # the exact Prometheus pod - kube-prometheus-stack's own pod labels
+    # weren't independently confirmed at write time, and a guessed wrong
+    # label would silently block all scraping (looks like a Prometheus
+    # config problem, is actually this policy - same failure-mode class as
+    # incidents.md #6). Coarser than ideal, but correct. Narrow to a
+    # podSelector once confirmed with `kubectl get pods -n monitoring
+    # --show-labels` - same principle already applied to the VPC CIDR
+    # ipBlock scoping in 18/19/20.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 3001

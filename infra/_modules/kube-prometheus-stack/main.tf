@@ -45,6 +45,17 @@ resource "helm_release" "kube_prometheus_stack" {
             requests = { cpu = "100m", memory = "256Mi" }
             limits   = { cpu = "500m", memory = "512Mi" }
           }
+
+          # backend/frontend ServiceMonitors live in task-manager,
+          # not monitoring. Without these three lines Prometheus Operator
+          # only watches ServiceMonitors matching its own Helm release
+          # label, in its own namespace - the chart's secure-by-default
+          # posture, deliberately loosened here since this is a
+          # single-team staging cluster, not a multi-tenant one where
+          # namespace isolation between teams' metrics would matter.
+          serviceMonitorSelectorNilUsesHelmValues = false
+          serviceMonitorSelector                  = {}
+          serviceMonitorNamespaceSelector         = {}
         }
       }
 

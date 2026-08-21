@@ -176,3 +176,13 @@ resource "local_file" "servicemonitor_frontend" {
   filename = "${path.module}/k8s-generated/25-servicemonitor-frontend.yaml"
   content  = file("${path.module}/k8s-templates/25-servicemonitor-frontend.yaml")
 }
+
+resource "local_file" "prometheusrule_app_alerts" {
+  filename = "${path.module}/k8s-generated/26-prometheusrule-app-alerts.yaml"
+  content  = file("${path.module}/k8s-templates/26-prometheusrule-app-alerts.yaml")
+}
+
+resource "local_file" "grafana_dashboard_app_overview" {
+  filename = "${path.module}/k8s-generated/27-grafana-dashboard-app-overview.yaml"
+  content  = file("${path.module}/k8s-templates/27-grafana-dashboard-app-overview.yaml")
+}

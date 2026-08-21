@@ -1,0 +1,57 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: task-manager-alerts
+  namespace: task-manager
+spec:
+  groups:
+    - name: task-manager.rules
+      rules:
+        # job="backend" comes from the Service name (10-service-backend.yaml)
+        # - Prometheus Operator sets the `job` label from the scraped
+        # Service's metadata.name by default, no override configured.
+        - alert: BackendHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job="backend", status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="backend"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Backend 5xx error rate above 5% for 5 minutes'
+            description: '{{ $value | humanizePercentage }} of backend requests are returning 5xx.'
+
+        - alert: BackendHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="backend"}[5m])) by (le)
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Backend p95 latency above 1s for 10 minutes'
+            description: 'p95 request duration is {{ $value | humanizeDuration }}.'
+
+        # Covers both backend and frontend targets going unreachable -
+        # includes a pod crash, a NetworkPolicy misconfiguration blocking
+        # the scrape (the exact failure mode incidents.md #6 warns about
+        # for a different symptom), or a bad rollout.
+        - alert: TaskManagerTargetDown
+          expr: up{job=~"backend|frontend"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: '{{ $labels.job }} is not reachable by Prometheus'
+            description: 'The {{ $labels.job }} scrape target has been down for 2 minutes.'
+
+        - alert: TaskManagerPodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{namespace="task-manager"}[15m]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Pod {{ $labels.pod }} is restarting repeatedly'
+            description: '{{ $labels.container }} in {{ $labels.pod }} restarted more than 3 times in 15 minutes.'

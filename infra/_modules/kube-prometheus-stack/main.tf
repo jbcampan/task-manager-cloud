@@ -56,6 +56,15 @@ resource "helm_release" "kube_prometheus_stack" {
           serviceMonitorSelectorNilUsesHelmValues = false
           serviceMonitorSelector                  = {}
           serviceMonitorNamespaceSelector         = {}
+
+          # Same reasoning, for PrometheusRule this time - our
+          # alerting rules live in task-manager, alongside the app
+          # manifests they alert on, not in monitoring. Loosened for the
+          # same single-team-cluster reason as the ServiceMonitor
+          # selector above.
+          ruleSelectorNilUsesHelmValues = false
+          ruleSelector                  = {}
+          ruleNamespaceSelector         = {}
         }
       }
 
@@ -65,6 +74,49 @@ resource "helm_release" "kube_prometheus_stack" {
             requests = { cpu = "25m", memory = "64Mi" }
             limits   = { cpu = "100m", memory = "128Mi" }
           }
+        }
+
+        # Routing skeleton, no real notification channel wired up
+        # yet. "critical-receiver" has no notifiers configured - alerts
+        # matching it are grouped and visible in the Alertmanager UI, but
+        # nothing is sent externally. Swapping in a real channel (Slack/
+        # Discord/PagerDuty webhook_configs) later would follow the same
+        # pattern already used for JWT/RDS credentials: the
+        # webhook URL stored in Secrets Manager, synced in via an
+        # ExternalSecret, never committed here in plaintext.
+        config = {
+          global = {
+            resolve_timeout = "5m"
+          }
+          route = {
+            receiver        = "null-receiver"
+            group_by        = ["alertname", "namespace"]
+            group_wait      = "30s"
+            group_interval  = "5m"
+            repeat_interval = "4h"
+            routes = [
+              {
+                receiver = "critical-receiver"
+                matchers = ["severity = \"critical\""]
+                continue = false
+              }
+            ]
+          }
+          receivers = [
+            { name = "null-receiver" },
+            { name = "critical-receiver" },
+          ]
+          # A firing critical alert suppresses the matching warning-level
+          # one for the same alertname/namespace - avoids two alerts for
+          # what's really one underlying problem (e.g. BackendHighErrorRate
+          # at both warning and critical thresholds simultaneously).
+          inhibit_rules = [
+            {
+              source_matchers = ["severity = \"critical\""]
+              target_matchers = ["severity = \"warning\""]
+              equal           = ["alertname", "namespace"]
+            }
+          ]
         }
       }
 
@@ -76,6 +128,22 @@ resource "helm_release" "kube_prometheus_stack" {
         resources = {
           requests = { cpu = "50m", memory = "128Mi" }
           limits   = { cpu = "200m", memory = "256Mi" }
+        }
+
+        # The default (chart-bundled) dashboards - Kubernetes
+        # compute resources, node metrics, etc. - already ship enabled.
+        # This sidecar watches for additional ConfigMaps labeled
+        # grafana_dashboard: "1" and loads them automatically - no manual
+        # dashboard import through the Grafana UI. searchNamespace: "ALL"
+        # is the same secure-by-default loosening already applied to
+        # serviceMonitorSelector/ruleSelector above - our dashboard
+        # ConfigMap lives in task-manager, not monitoring.
+        sidecar = {
+          dashboards = {
+            enabled         = true
+            label           = "grafana_dashboard"
+            searchNamespace = "ALL"
+          }
         }
       }
 

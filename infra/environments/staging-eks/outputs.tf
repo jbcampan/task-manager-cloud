@@ -47,3 +47,8 @@ output "alb_controller_role_arn" {
   description = "IAM role ARN for the AWS Load Balancer Controller."
   value       = module.alb_controller.role_arn
 }
+
+output "github_deploy_eks_role_arn" {
+  description = "IAM role ARN GitHub Actions assumes to deploy to EKS. Set as DEPLOY_ROLE_ARN in the staging-eks GitHub Environment."
+  value       = module.github_deploy_eks.role_arn
+}

@@ -23,6 +23,11 @@ output "cluster_security_group_id" {
   value       = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
 }
 
+output "cluster_arn" {
+  description = "ARN of the EKS cluster - needed to scope IAM policies (e.g. eks:DescribeCluster for the GitHub Actions deploy role)."
+  value       = aws_eks_cluster.this.arn
+}
+
 output "oidc_provider_arn" {
   description = "ARN of the IAM OIDC provider registered for this cluster. Required by IRSA role trust policies."
   value       = aws_iam_openid_connect_provider.eks.arn

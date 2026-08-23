@@ -35,13 +35,9 @@ spec:
           # pattern in deploy-reusable.yml (which likewise never touches
           # ECS's separate entryPoint field).
           args: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
-          env:
-            - name: DB_HOST
-              value: "${db_host}"
-            - name: DB_PORT
-              value: "${db_port}"
-            - name: DB_NAME
-              value: "${db_name}"
+          # DB_HOST/DB_PORT/DB_NAME come from backend-config via
+          # envFrom below - no dedicated env: block needed anymore, same
+          # simplification as deployment-backend.yaml.
           envFrom:
             - configMapRef:
                 name: backend-config

@@ -1,4 +1,4 @@
-name: CD
+name: CD (ECS)
 
 on:
   workflow_run:
@@ -27,7 +27,7 @@ jobs:
     # is a no-op until the PROD_INFRA_READY repo variable is set to
     # "true", which happens once that Terraform environment is applied.
     if: ${{ vars.PROD_INFRA_READY == 'true' }}
-    uses: ./.github/workflows/deploy-reusable.yml
+    uses: ./.github/workflows/deploy-ecs-reusable.yml
     permissions:
       id-token: write
       contents: read

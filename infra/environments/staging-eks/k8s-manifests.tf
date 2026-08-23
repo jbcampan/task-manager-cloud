@@ -136,9 +136,8 @@ resource "local_file" "job_migrate" {
   content = templatefile("${path.module}/k8s-templates/21-job-migrate.yaml.tftpl", {
     backend_image   = local.backend_image
     image_tag_short = local.image_tag_short
-    db_host         = data.terraform_remote_state.staging.outputs.db_instance_address
-    db_port         = 5432
-    db_name         = data.terraform_remote_state.staging.outputs.db_name
+    # db_host/db_port/db_name removed - now sourced from backend-config
+    # via envFrom.
   })
 }
 

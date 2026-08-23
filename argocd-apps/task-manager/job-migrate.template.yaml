@@ -1,0 +1,44 @@
+# NOT part of kustomization.yaml's resources: - ArgoCD does not sync this
+# file. It is applied imperatively by deploy-eks-reusable.yml (envsubst +
+# kubectl apply), one-off, before every sync - same reasoning as why the
+# ECS pipeline runs a one-off ecs run-task instead of letting a
+# long-lived service run migrations.
+#
+# This is a deliberate, documented duplication of
+# k8s-templates/21-job-migrate.yaml.tftpl: that file is the source of
+# truth for the platform-level values (DB_HOST etc., indirectly via
+# backend-config) rendered once by `terraform apply`; this copy only
+# leaves the two values that change on every deploy (image, tag) as CI
+# placeholders. If backend-config's shape ever changes, re-derive this
+# file from the .tftpl one by hand.
+#
+# Placeholders use ${UPPERCASE} on purpose (shell/envsubst convention),
+# distinct from Terraform's ${lowercase_snake_case} in the .tftpl file -
+# makes it visually obvious which system renders which file.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backend-migrate-${IMAGE_TAG_SHORT}
+  namespace: task-manager
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        db-access: 'true'
+    spec:
+      serviceAccountName: backend
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ${BACKEND_IMAGE}
+          imagePullPolicy: Always
+          args: ['node', 'node_modules/prisma/build/index.js', 'migrate', 'deploy']
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: task-manager-jwt-secret
+            - secretRef:
+                name: task-manager-rds-credentials

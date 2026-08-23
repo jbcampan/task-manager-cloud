@@ -1,0 +1,58 @@
+name: CD (EKS)
+
+on:
+  workflow_run:
+    workflows: ['Build & Push']
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write # bump-manifest commits back to argocd-apps/task-manager/
+
+env:
+  ECR_BACKEND_REPOSITORY: ${{ vars.ECR_BACKEND_REPOSITORY }}
+  ECR_FRONTEND_REPOSITORY: ${{ vars.ECR_FRONTEND_REPOSITORY }}
+
+jobs:
+  bump-manifest:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # Default GITHUB_TOKEN, with contents: write above, can push
+          # back to the same repo - no separate PAT needed.
+
+      - name: Install kustomize
+        run: |
+          curl -sSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Bump image tags
+        working-directory: argocd-apps/task-manager
+        run: |
+          kustomize edit set image \
+            "${{ env.ECR_BACKEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}" \
+            "${{ env.ECR_FRONTEND_REPOSITORY }}:${{ github.event.workflow_run.head_sha }}"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add argocd-apps/task-manager/kustomization.yaml
+          # No-op guard: if this exact tag was already deployed (e.g. a
+          # manual re-run), there is nothing to commit - not an error.
+          git diff --staged --quiet && echo "No image change, skipping commit." && exit 0
+          git commit -m "chore(deploy): bump task-manager image to ${{ github.event.workflow_run.head_sha }}"
+          git push
+
+  deploy:
+    needs: bump-manifest
+    uses: ./.github/workflows/deploy-eks-reusable.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      environment: staging-eks
+      image_tag: ${{ github.event.workflow_run.head_sha }}

@@ -1,0 +1,123 @@
+name: Deploy EKS (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'GitHub Environment to deploy to (staging-eks)'
+        required: true
+        type: string
+      image_tag:
+        description: 'Docker image tag to deploy (commit SHA)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      AWS_REGION: eu-west-3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.image_tag }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
+
+      # --- Migration: applied imperatively, ahead of the ArgoCD sync ---
+      # Same reasoning as the ECS pipeline's one-off ecs run-task: the
+      # migration must run against the NEW image, before anything serving
+      # traffic sees the new schema, with an explicit exit-code check
+      # rather than a blind retry.
+
+      - name: Render and apply migration Job
+        id: migrate
+        run: |
+          export BACKEND_IMAGE="${{ vars.ECR_BACKEND_REPOSITORY }}:${{ inputs.image_tag }}"
+          export IMAGE_TAG_SHORT="$(echo "${{ inputs.image_tag }}" | cut -c1-7)"
+
+          envsubst < argocd-apps/task-manager/job-migrate.template.yaml | kubectl apply -f -
+
+          echo "job_name=backend-migrate-${IMAGE_TAG_SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for migration job and check result
+        run: |
+          JOB_NAME="${{ steps.migrate.outputs.job_name }}"
+          NS=task-manager
+
+          echo "Waiting for $JOB_NAME to finish..."
+          for i in $(seq 1 60); do
+            SUCCEEDED=$(kubectl get job "$JOB_NAME" -n "$NS" -o jsonpath='{.status.succeeded}' 2>/dev/null || true)
+            FAILED=$(kubectl get job "$JOB_NAME" -n "$NS" -o jsonpath='{.status.failed}' 2>/dev/null || true)
+
+            if [ "$SUCCEEDED" = "1" ]; then
+              echo "Migration succeeded."
+              exit 0
+            fi
+            if [ -n "$FAILED" ] && [ "$FAILED" -ge 1 ]; then
+              echo "::error::Migration job failed."
+              kubectl logs "job/$JOB_NAME" -n "$NS" --tail=100
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "::error::Migration job did not reach a terminal state within timeout."
+          kubectl logs "job/$JOB_NAME" -n "$NS" --tail=100
+          exit 1
+
+      # --- App deployment: delegated to ArgoCD (pull/GitOps) ---
+      # The image bump was already committed by cd-eks.yml's
+      # bump-manifest job, before this workflow was even called - ArgoCD
+      # may already be mid-sync via its own polling loop. This explicit
+      # sync + wait exists only to get a synchronous, fast CI result
+      # instead of depending on that loop's default interval.
+
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+
+      - name: Port-forward to ArgoCD server
+        run: |
+          # Tunnels through the EKS API server connection kubectl already
+          # authenticated to above (via OIDC) - works with no public
+          # ArgoCD endpoint at all, same as a human's local port-forward.
+          kubectl -n argocd port-forward svc/argocd-server 8080:80 &
+          echo $! > pf.pid
+
+          for i in $(seq 1 10); do
+            curl -sf http://localhost:8080/healthz && break
+            sleep 2
+          done
+
+      - name: Sync ArgoCD application
+        env:
+          ARGOCD_SERVER: localhost:8080
+          ARGOCD_OPTS: --plaintext
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_CI_TOKEN }}
+        run: |
+          argocd app sync task-manager --timeout 300
+          argocd app wait task-manager --health --timeout 300
+
+      - name: Stop port-forward
+        if: always()
+        run: kill "$(cat pf.pid)" 2>/dev/null || true
+
+      - name: Summary
+        run: |
+          echo "### Deployed to \`${{ inputs.environment }}\` via ArgoCD :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image tag: \`${{ inputs.image_tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ vars.APP_URL }}" >> "$GITHUB_STEP_SUMMARY"

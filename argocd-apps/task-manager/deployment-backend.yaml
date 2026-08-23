@@ -19,42 +19,30 @@ spec:
     metadata:
       labels:
         app: backend
-        # Separate from "app: backend" on purpose - that label is also the
-        # Service's selector (10-service-backend.yaml). This one exists
-        # only so the egress NetworkPolicy can target "anything that
-        # talks to RDS/S3", including the one-off migration Job,
-        # without accidentally putting that Job's pod into the Service's
+        # Separate from "app: backend" on purpose - see 18-networkpolicy-
+        # alb-to-backend.yaml.tftpl / egress policy: this label targets
+        # "anything that talks to RDS/S3", including the one-off
+        # migration Job, without putting that Job in the Service's
         # load-balancing rotation.
-        db-access: "true"
+        db-access: 'true'
     spec:
       serviceAccountName: backend
-      # Matches app.enableShutdownHooks() in main.ts - gives NestJS time to
-      # close DB connections cleanly on SIGTERM before the pod is killed.
+      # Matches app.enableShutdownHooks() in main.ts - gives NestJS time
+      # to close DB connections cleanly on SIGTERM before the pod is killed.
       terminationGracePeriodSeconds: 30
       containers:
         - name: backend
-          image: ${backend_image}
-          # Tag is a real commit SHA (var.image_tag), not "latest" - see
-          # variables.tf for why this isn't auto-resolved. imagePullPolicy:
-          # Always is kept regardless: ECR tag mutability for this repo
-          # (IMMUTABLE vs MUTABLE) isn't confirmed from here, so this stays
-          # the safe default rather than assuming a SHA tag can never be
-          # overwritten.
+          # Placeholder - overwritten by the images: transformer in
+          # kustomization.yaml. Never edit this tag by hand; it is
+          # rewritten by CI (`kustomize edit set image`) on every deploy.
+          image: 595949105416.dkr.ecr.eu-west-3.amazonaws.com/task-manager-backend:placeholder
           imagePullPolicy: Always
           ports:
             - containerPort: 3001
-          # apps/backend/entrypoint.sh rebuilds DATABASE_URL itself at
-          # container start from these 5 values (DB_USERNAME/DB_PASSWORD
-          # come from the Secret via envFrom below) and overwrites any
-          # DATABASE_URL already in the environment - so these three are
-          # required even though the app code never reads them directly.
-          env:
-            - name: DB_HOST
-              value: "${db_host}"
-            - name: DB_PORT
-              value: "${db_port}"
-            - name: DB_NAME
-              value: "${db_name}"
+          # DB_HOST/DB_PORT/DB_NAME now come from backend-config (see
+          # k8s-templates/04-configmap-backend.yaml.tftpl, M4.2) instead
+          # of a dedicated env: block here - this manifest carries no
+          # value that Terraform alone knows.
           envFrom:
             - configMapRef:
                 name: backend-config

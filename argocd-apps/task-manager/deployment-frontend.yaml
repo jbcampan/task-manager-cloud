@@ -24,7 +24,8 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: frontend
-          image: ${frontend_image}
+          # Placeholder - see deployment-backend.yaml comment above.
+          image: 595949105416.dkr.ecr.eu-west-3.amazonaws.com/task-manager-frontend:placeholder
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

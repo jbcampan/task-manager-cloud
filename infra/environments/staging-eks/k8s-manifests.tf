@@ -48,6 +48,12 @@ resource "local_file" "configmap_backend" {
   content = templatefile("${path.module}/k8s-templates/04-configmap-backend.yaml.tftpl", {
     aws_region        = var.aws_region
     uploads_bucket_id = data.terraform_remote_state.staging.outputs.uploads_bucket_id
+    # Same source as job_migrate below - the backend Deployment used to
+    # read these directly (now moved to argocd-apps/task-manager/, out of
+    # Terraform's reach), so the ConfigMap carries them instead.
+    db_host = data.terraform_remote_state.staging.outputs.db_instance_address
+    db_port = 5432
+    db_name = data.terraform_remote_state.staging.outputs.db_name
   })
 }
 
@@ -68,32 +74,11 @@ resource "local_file" "serviceaccount_frontend" {
   content  = file("${path.module}/k8s-templates/07-serviceaccount-frontend.yaml")
 }
 
-resource "local_file" "deployment_backend" {
-  filename = "${path.module}/k8s-generated/08-deployment-backend.yaml"
-  content = templatefile("${path.module}/k8s-templates/08-deployment-backend.yaml.tftpl", {
-    backend_image = local.backend_image
-    db_host       = data.terraform_remote_state.staging.outputs.db_instance_address
-    db_port       = 5432
-    db_name       = data.terraform_remote_state.staging.outputs.db_name
-  })
-}
-
-resource "local_file" "deployment_frontend" {
-  filename = "${path.module}/k8s-generated/09-deployment-frontend.yaml"
-  content = templatefile("${path.module}/k8s-templates/09-deployment-frontend.yaml.tftpl", {
-    frontend_image = local.frontend_image
-  })
-}
-
-resource "local_file" "service_backend" {
-  filename = "${path.module}/k8s-generated/10-service-backend.yaml"
-  content  = file("${path.module}/k8s-templates/10-service-backend.yaml")
-}
-
-resource "local_file" "service_frontend" {
-  filename = "${path.module}/k8s-generated/11-service-frontend.yaml"
-  content  = file("${path.module}/k8s-templates/11-service-frontend.yaml")
-}
+# backend/frontend Deployment + Service used to be rendered here (as
+# 08/09/10/11) - they live as static manifests in
+# argocd-apps/task-manager/, synced by ArgoCD instead of applied via
+# `kubectl apply -f k8s-generated/`. See infra/environments/staging-eks/
+# argocd.tf for the Application resource that points there.
 
 resource "local_file" "ingress_backend" {
   filename = "${path.module}/k8s-generated/12-ingress-backend.yaml"

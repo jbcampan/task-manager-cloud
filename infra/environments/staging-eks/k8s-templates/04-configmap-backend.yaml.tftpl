@@ -13,3 +13,11 @@ data:
   CORS_ORIGIN: "k8s-taskmanager-3c184ca188-28099065.eu-west-3.elb.amazonaws.com"
   AWS_REGION: "${aws_region}"
   S3_BUCKET_NAME: "${uploads_bucket_id}"
+  # Moved here from the backend Deployment's own env block (M4.2). The
+  # Deployment is now a static manifest committed to Git and synced by
+  # ArgoCD (argocd-apps/task-manager/), so it can no longer carry values
+  # only known at `terraform apply` time - it only references this
+  # ConfigMap by name via envFrom.
+  DB_HOST: "${db_host}"
+  DB_PORT: "${db_port}"
+  DB_NAME: "${db_name}"

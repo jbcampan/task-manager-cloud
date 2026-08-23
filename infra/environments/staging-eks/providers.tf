@@ -14,6 +14,14 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.16"
     }
+    # kubernetes_manifest (built-in) is unreliable for CRD instances -
+    # "Failed to construct REST client: no client config" is a known
+    # limitation, not a config error. kubectl_manifest doesn't have this
+    # issue.
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = "~> 1.14"
+    }
     tls = {
       source  = "hashicorp/tls"
       version = "~> 4.0"
@@ -52,6 +60,13 @@ provider "helm" {
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
     token                  = data.aws_eks_cluster_auth.this.token
   }
+}
+
+provider "kubectl" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.this.token
+  load_config_file       = false
 }
 
 locals {

@@ -9,3 +9,5 @@ kubernetes_version = "1.30" # verify AWS EKS standard support window before ever
 image_tag = "REPLACE_WITH_A_REAL_SHA"
 
 grafana_admin_password = "changeme"
+
+git_repo_url = "https://github.com/<your-username>/task-manager-cloud.git"

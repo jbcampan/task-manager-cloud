@@ -76,3 +76,8 @@ variable "grafana_admin_password" {
   type        = string
   sensitive   = true
 }
+
+variable "git_repo_url" {
+  description = "HTTPS URL of this repository, used by ArgoCD as the sync source. Assumed public - no repository credentials are configured. If the repo becomes private, add a `kubernetes_secret` labeled `argocd.argoproj.io/secret-type: repository` with the PAT before this will work."
+  type        = string
+}

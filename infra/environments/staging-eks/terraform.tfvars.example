@@ -11,3 +11,5 @@ image_tag = "REPLACE_WITH_A_REAL_SHA"
 grafana_admin_password = "changeme"
 
 git_repo_url = "https://github.com/<your-username>/task-manager-cloud.git"
+
+github_repository = "<your-username>/<your-repository>"

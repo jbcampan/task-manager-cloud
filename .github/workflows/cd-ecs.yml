@@ -13,7 +13,7 @@ permissions:
 jobs:
   deploy-staging:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: ./.github/workflows/deploy-reusable.yml
+    uses: ./.github/workflows/deploy-ecs-reusable.yml
     permissions:
       id-token: write
       contents: read

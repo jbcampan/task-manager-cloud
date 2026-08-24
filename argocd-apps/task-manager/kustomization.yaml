@@ -12,6 +12,6 @@ resources:
 # Deployment files exactly, or the transformer silently does nothing.
 images:
 - name: 595949105416.dkr.ecr.eu-west-3.amazonaws.com/task-manager-backend
-  newTag: c6d63d19f7e23288e46bf1cc0a4f580a83c6e978
+  newTag: 88580aebd6b254108a110cbba40540e017203d7d
 - name: 595949105416.dkr.ecr.eu-west-3.amazonaws.com/task-manager-frontend
-  newTag: c6d63d19f7e23288e46bf1cc0a4f580a83c6e978
+  newTag: 88580aebd6b254108a110cbba40540e017203d7d

@@ -9,7 +9,7 @@ import { UsersService } from '../users/users.service';
 
 import { AuthService } from './auth.service';
 
-// Mock bcryptjs to avoid slow hashing in unit test.s
+// Mock bcryptjs to avoid slow hashing in unit tests
 jest.mock('bcryptjs', () => ({
   hash: jest.fn().mockResolvedValue('hashed_password'),
   compare: jest.fn(),

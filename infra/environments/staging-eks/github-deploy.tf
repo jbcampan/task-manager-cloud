@@ -24,24 +24,13 @@ resource "aws_eks_access_entry" "github_deploy" {
 # pods/portforward, needed by the ArgoCD sync step in
 # deploy-eks-reusable.yml). Scoped per-namespace, never cluster-wide -
 # this role never needs kube-system, monitoring, or ESO's namespace.
-resource "aws_eks_access_policy_association" "github_deploy_task_manager" {
+resource "aws_eks_access_policy_association" "github_deploy" {
   cluster_name  = module.eks.cluster_name
   principal_arn = module.github_deploy_eks.role_arn
   policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy"
 
   access_scope {
     type       = "namespace"
-    namespaces = ["task-manager"]
-  }
-}
-
-resource "aws_eks_access_policy_association" "github_deploy_argocd" {
-  cluster_name  = module.eks.cluster_name
-  principal_arn = module.github_deploy_eks.role_arn
-  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy"
-
-  access_scope {
-    type       = "namespace"
-    namespaces = ["argocd"]
+    namespaces = ["task-manager", "argocd"]
   }
 }

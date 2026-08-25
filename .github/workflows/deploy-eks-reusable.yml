@@ -95,13 +95,21 @@ jobs:
           # Tunnels through the EKS API server connection kubectl already
           # authenticated to above (via OIDC) - works with no public
           # ArgoCD endpoint at all, same as a human's local port-forward.
-          kubectl -n argocd port-forward svc/argocd-server 8080:80 &
+          kubectl -n argocd port-forward svc/argocd-server 8080:80 \
+            > /tmp/argocd-port-forward.log 2>&1 &
           echo $! > pf.pid
 
           for i in $(seq 1 10); do
-            curl -sf http://localhost:8080/healthz && break
+            if curl --fail --max-time 5 -s http://localhost:8080/healthz > /dev/null; then
+              echo "Port-forward is up."
+              exit 0
+            fi
             sleep 2
           done
+
+          echo "::error::Port-forward to ArgoCD never became reachable."
+          cat /tmp/argocd-port-forward.log
+          exit 1
 
       - name: Sync ArgoCD application
         env:
@@ -109,8 +117,8 @@ jobs:
           ARGOCD_OPTS: --plaintext
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_CI_TOKEN }}
         run: |
-          argocd app sync task-manager --timeout 300
-          argocd app wait task-manager --health --timeout 300
+          timeout 120 argocd app sync task-manager --timeout 60
+          timeout 120 argocd app wait task-manager --health --timeout 60
 
       - name: Stop port-forward
         if: always()

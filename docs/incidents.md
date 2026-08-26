@@ -412,14 +412,185 @@ resource's creation itself idempotent regardless of what already exists on the c
 
 ---
 
-## Why these eleven share a common thread
+## 12. `cd-ecs.yml` pointed to a workflow file that no longer existed
+
+**Context**: `cd.yml`/`deploy-reusable.yml` were renamed to `cd-ecs.yml`/`deploy-ecs-reusable.yml`
+to keep the ECS and EKS deployment pipelines clearly separated (M4.3). The rename itself was
+mechanical (`git mv`), but the internal reference wasn't updated to match.
+
+**Error** error parsing called workflow ".github/workflows/cd-ecs.yml" ->
+"./.github/workflows/deploy-reusable.yml" : failed to fetch workflow: workflow was not found.
+
+**Root cause**: `cd-ecs.yml`'s `uses:` field still pointed at the old filename
+(`deploy-reusable.yml`), which no longer existed after the rename.
+
+**Fix**:
+
+```yaml
+# .github/workflows/cd-ecs.yml
+uses: ./.github/workflows/deploy-ecs-reusable.yml
+```
+
+**Lesson**: renaming a reusable workflow file doesn't update the workflows that call it - GitHub
+Actions has no equivalent of an IDE's "find references" for `uses:` strings, and won't catch a stale
+one until the workflow actually runs. Worth grepping for the old filename across
+`.github/workflows/` after any such rename, rather than trusting the rename to be self-contained.
+
+---
+
+## 13. Missing GitHub Environment variable failed silently, not loudly
+
+**Context**: first real run of `deploy-eks-reusable.yml`, after the `staging-eks` GitHub Environment
+had been created but before every variable it needs had been filled in.
+
+**Symptom**:
+
+Run aws eks update-kubeconfig --name "" --region "eu-west-3" ... AccessDeniedException ...
+eks:ListClusters ... is not authorized
+
+**Root cause**: `EKS_CLUSTER_NAME` had never been added to the `staging-eks` Environment.
+`${{ vars.EKS_CLUSTER_NAME }}` doesn't fail when the variable doesn't exist - it silently resolves
+to an empty string. The AWS CLI then interpreted the empty `--name ""` as "operate without a
+specific cluster", which routed the call toward `eks:ListClusters` instead of the narrower
+`eks:DescribeCluster` the IAM role was actually scoped for - surfacing as a misleading permissions
+error that had nothing to do with the real problem.
+
+**Fix**: added `EKS_CLUSTER_NAME` to the `staging-eks` Environment.
+
+**Lesson**: an unset `vars.*`/`secrets.*` reference in GitHub Actions is a silent empty string, not
+a build error - the resulting failure can show up several steps downstream and look like a
+completely different problem (here, an IAM permissions issue). Before a new workflow's first run,
+grep every `vars.` and `secrets.` reference it contains and check each one against what's actually
+configured in the target Environment:
+
+```bash
+grep -oE '(vars|secrets)\.[A-Z_]+' .github/workflows/deploy-eks-reusable.yml .github/workflows/cd-eks.yml | sort -u
+```
+
+---
+
+## 14. `terraform apply` prompted for a missing variable, and the habitual "yes" landed on the wrong prompt
+
+**Context**: `github_repository` had no default and wasn't yet set in
+`staging-eks/terraform.tfvars`. Terraform prompted for it interactively, immediately followed by its
+usual `apply` confirmation prompt.
+
+**Symptom**: the resulting IAM trust policy's `sub` condition read
+`repo:yes:environment:staging-eks` instead of
+`repo:jbcampan/task-manager-cloud:environment:staging-eks`
+
+- silently breaking OIDC federation (`Not authorized to perform sts:AssumeRoleWithWebIdentity`) two
+  work sessions later, on an apparently unrelated run.
+
+**Root cause**: typing the habitual `yes` (for the apply confirmation) in response to the variable
+prompt instead, without noticing a second, unfamiliar prompt had appeared first.
+
+**Fix**:
+
+```bash
+echo 'github_repository = "jbcampan/task-manager-cloud"' >> infra/environments/staging-eks/terraform.tfvars
+terraform apply -var-file=terraform.tfvars -target=module.github_deploy_eks
+```
+
+**Lesson**: a `variable` block with no `default` will always prompt if it's missing from every
+`.tfvars` file in use - harmless on its own, but easy to answer on autopilot when it appears right
+before a confirmation prompt that's normally the only thing asked. Every variable an environment
+depends on is worth having explicitly in `terraform.tfvars`, precisely to avoid an interactive
+prompt appearing unannounced in the first place.
+
+---
+
+## 15. One IAM role can't hold two `AmazonEKSEditPolicy` associations scoped to different namespaces
+
+**Context**: the GitHub Actions deploy role needed edit access to two namespaces - `task-manager`
+(for the migration `Job`) and `argocd` (for the port-forward/sync step) - modeled as two separate
+`aws_eks_access_policy_association` resources, one per namespace.
+
+**Symptom**: applying the second association silently replaced the first instead of adding to it:
+
+~ access_scope { ~ namespaces = [ # forces replacement
+
+- "argocd",
+
+* "task-manager", ] }
+
+`kubectl` calls against the `task-manager` namespace then failed with `Forbidden`, since only the
+`argocd` association actually existed.
+
+**Root cause**: an EKS access policy association is keyed by the pair (principal, policy), not
+(principal, policy, namespace). Associating `AmazonEKSEditPolicy` to the same role twice - once per
+namespace - doesn't create two associations; the second one overwrites the first at the AWS API
+level, regardless of what Terraform's state file believes exists.
+
+**Fix**: a single association carrying both namespaces in one `access_scope`:
+
+```hcl
+resource "aws_eks_access_policy_association" "github_deploy" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = module.github_deploy_eks.role_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSEditPolicy"
+
+  access_scope {
+    type       = "namespace"
+    namespaces = ["task-manager", "argocd"]
+  }
+}
+```
+
+**Lesson**: EKS Access Entries' policy associations don't compose the way IAM policy attachments
+do - "one resource per scope" is a reasonable mental model for IAM but doesn't hold here. Worth
+checking a service's actual uniqueness constraints before assuming a pattern that works elsewhere in
+AWS carries over directly.
+
+---
+
+## 16. `argocd app sync` hung on the CI runner for 12+ minutes despite a successful sync
+
+**Context**: first real end-to-end EKS deployment via `deploy-eks-reusable.yml`.
+
+**Symptom**: `argocd app sync task-manager --timeout 300` hung well past its own 300-second timeout,
+eventually cancelled manually after ~12m44s. Inspecting the `Application` afterward showed `Synced`
+/ `Healthy`, with the last sync operation completed in under a second (`Started: 16:41:22Z`,
+`Finished: 16:41:23Z`).
+
+**Root cause**: the `kubectl port-forward` tunnel between the runner and the ArgoCD server stopped
+responding without closing the connection. The CLI kept waiting indefinitely for a reply that never
+arrived - `--timeout 300` only bounds the sync operation itself once a response is received, not a
+silently dead connection. The actual sync had already succeeded independently of the CLI call
+waiting on it, so the deployment itself was never at risk - only the pipeline's ability to report
+that fact.
+
+**Fix**: fail the port-forward step outright if the tunnel isn't reachable within a few seconds
+(instead of proceeding regardless), and wrap the ArgoCD CLI calls in a shell-level `timeout` as a
+hard backstop the CLI's own flag doesn't provide:
+
+```yaml
+for i in $(seq 1 10); do curl --fail --max-time 5 -s http://localhost:8080/healthz > /dev/null &&
+exit 0 sleep 2 done echo "::error::Port-forward to ArgoCD never became reachable." exit 1
+```
+
+```yaml
+timeout 120 argocd app sync task-manager --timeout 60 timeout 120 argocd app wait task-manager
+--health --timeout 60
+```
+
+**Lesson**: a CLI tool's own `--timeout` flag typically only covers the operation it's aware it's
+waiting on, not a lower-level transport that's gone silently unresponsive. A tunnel like
+`kubectl port-forward` needs its own explicit liveness check and an external timeout wrapping the
+whole call, not just trust in the wrapped command's internal timeout.
+
+---
+
+## Why these sixteen share a common thread
 
 Most of the incidents above trace back to the same underlying tension: optimizing staging/prod for
 fast, cheap `destroy`/`apply` cycles rather than long-term stability the way a real production
 environment would be. AWS's and EKS's defaults are built for the opposite assumption - a cluster or
 secret that's created once and lives for months. That mismatch has a recurring cost - the kind
-documented here - which is better understood and explained than pretended away. The remaining
-incidents (#7, #9, #10) are specific to the ECS→EKS migration itself: assumptions and patterns that
-held on one platform (Terraform-tracked load balancers, a single `DATABASE_URL` variable, identical
-command-override semantics) didn't automatically carry over to the other, and each gap only surfaced
-by actually running the migration end to end.
+documented here - which is better understood and explained than pretended away. Incidents #7, #9,
+#10 are specific to the ECS→EKS migration itself: assumptions and patterns that held on one platform
+didn't automatically carry over to the other. Incidents #12-16, from wiring up the EKS CI/CD
+pipeline itself, share a different thread: most GitHub Actions/AWS failure modes here were silent by
+default (an empty variable, an overwritten policy association, a hung tunnel) rather than loud -
+each required actually running the pipeline end to end to surface, and each is now guarded against
+explicitly rather than just fixed once.
